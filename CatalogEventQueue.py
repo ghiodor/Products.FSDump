@@ -41,7 +41,7 @@ class CatalogEventQueue(Persistent):
 
     One way that this queue is extremely odd is that it really only
     keeps track of the last event for an object. This is because we
-    really obky *care* about the last event for an object.
+    really only *care* about the last event for an object.
 
     There are three types of events:
 
@@ -80,7 +80,7 @@ class CatalogEventQueue(Persistent):
     event of ADDED id REMOVED, of REMOVED is ADDED, and of CHANGED is
     CHANGED. 
 
-    Note that these rules represent huristics that attempt to provide
+    Note that these rules represent heuristics that attempt to provide
     efficient and sensible behavior for most cases. They are not "correct" in
     that they handle cases that may not seem handleable. For example,
     consider a sequence of transactions:
@@ -88,7 +88,7 @@ class CatalogEventQueue(Persistent):
       T1 adds an object
       T2 removes the object
       T3 adds the object
-      T4 processes the quete
+      T4 processes the queue
       T5 undoes T1
 
     It's not clear what should be done in this case? We decide to
