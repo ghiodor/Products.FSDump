@@ -13,6 +13,7 @@
     <p><b>&dtml-q_size; item(s) queued.</b></p>
     
     <form action="manage_process">
+      <input name="count" type="text" size="5" value="20">&nbsp;&nbsp;
       <input type="submit" value=" Process Queue " />
     </form>
 

@@ -225,6 +225,10 @@ class QueueCatalog(Implicit, SimpleItem):
             uid = '/'.join(uid)
 
         catalog = self.getZCatalog()
+        cat_indexes = list(catalog.indexes())
+        cat_indexes.sort()
+        immediate_indexes = list(self._immediate_indexes)
+        immediate_indexes.sort()
 
         # The ZCatalog API doesn't allow us to distinguish between
         # adds and updates, so we have to try to figure this out
@@ -241,22 +245,23 @@ class QueueCatalog(Implicit, SimpleItem):
 
         # Now, try to decide if the catalog has the uid (path).
 
-        if cataloged(catalog, uid):
-            event = CHANGED
-        else:
-            # Looks like we should add, but maybe there's already a
-            # pending add event. We'd better check the event queue:
-            if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
-                ADDED_EVENTS):
+        if immediate_indexes != cat_indexes:
+            if cataloged(catalog, uid):
                 event = CHANGED
             else:
-                event = ADDED
+                # Looks like we should add, but maybe there's already a
+                # pending add event. We'd better check the event queue:
+                if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
+                    ADDED_EVENTS):
+                    event = CHANGED
+                else:
+                    event = ADDED
 
-        self._update(uid, event)
+            self._update(uid, event)
 
-        if self._immediate_indexes:
+        if immediate_indexes:
             # Update some of the indexes immediately.
-            catalog.catalog_object(obj, uid, self._immediate_indexes)
+            catalog.catalog_object(obj, uid, immediate_indexes)
 
 
     def uncatalog_object(self, uid):
@@ -272,15 +277,22 @@ class QueueCatalog(Implicit, SimpleItem):
         if self._immediate_removal:
             self.process()
 
-    def process(self, max=None):
-        """Process pending events
 
-        Returns the number of events processed.
-        """
+    def process(self, max=None):
+        """ Process pending events and return number of events processed. """
+        if not self.manage_size():
+            return 0
+
         count = 0
         catalog = self.getZCatalog()
         for queue in filter(None, self._queues):
-            events = queue.process()
+            limit = None
+            if max:
+                # limit the number of events
+                limit = max - count
+
+            events = queue.process(limit)
+
             for uid, (t, event) in events.items():
                 if event is REMOVED:
                     if cataloged(catalog, uid):
@@ -290,14 +302,18 @@ class QueueCatalog(Implicit, SimpleItem):
                     if event is CHANGED and not cataloged(catalog, uid):
                         continue
                     # Note that the uid may be relative to the catalog.
-                    obj = catalog.unrestrictedTraverse(uid)
-                    catalog.catalog_object(obj, uid)
+                    obj = catalog.unrestrictedTraverse(uid, None)
+                    if obj is not None:
+                        catalog.catalog_object(obj, uid)
+
                 count = count + 1
+
             if max and count >= max:
-                # On surpassing the maximum, return immediately
+                # On reaching the maximum, return immediately
                 # so the caller can commit the transaction,
                 # sleep for a while, or do something else.
                 break
+
         return count
 
     #
@@ -362,14 +378,11 @@ class QueueCatalog(Implicit, SimpleItem):
 
         return size
 
-    def manage_process(self, REQUEST):
+    def manage_process(self, REQUEST, count=100):
         "Web UI to manually process queues"
-        # make sure we have necessary perm
-        self.getZCatalog('catalog_object')
-        self.getZCatalog('uncatalog_object')
-        self.process()
-
-        msg = 'Queue processed'
+        count = int(count)
+        processed = self.process(max=count)
+        msg = '%i Queue item(s) processed' % processed
         return self.manage_queue(manage_tabs_message=msg)
 
     # Provide Zope 2 offerings
@@ -393,10 +406,12 @@ class QueueCatalog(Implicit, SimpleItem):
     # Disallow access to subobjects with no security assertions.
     security.setDefaultAccess('deny')
 
-    security.declarePublic('manage_process', 'getTitle', 'title_or_id')
+    security.declarePublic('getTitle', 'title_or_id')
 
     security.declareProtected(manage_zcatalog_entries,
-                              'catalog_object', 'uncatalog_object', 'refreshCatalog')
+                              'catalog_object', 'uncatalog_object',
+                              'refreshCatalog',
+                              'manage_process', 'process')
 
     security.declareProtected(
         'View management screens',

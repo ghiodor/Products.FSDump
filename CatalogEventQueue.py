@@ -99,7 +99,7 @@ class CatalogEventQueue(Persistent):
     free to think of cases for which our decisions are unacceptably
     wrong and write unit tests for these cases.
 
-    There are two kinds of transactions that effect the queue:
+    There are two kinds of transactions that affect the queue:
 
     - Application transactions always add or modify events. They never
       remove events.
@@ -149,10 +149,23 @@ class CatalogEventQueue(Persistent):
             state = state[1]
         return state
 
-    def process(self):
+    def process(self, limit=None):
+        """Removes and returns events from this queue.
+
+        If limit is specified, at most (limit) events are removed.
+        """
         data = self._data
-        self._data = {}
-        return data
+        if not limit or len(data) <= limit:
+            self._data = {}
+            return data
+        else:
+            self._p_changed = 1
+            res = {}
+            keys = data.keys()[:limit]
+            for key in keys:
+                res[key] = data[key]
+                del data[key]
+            return res
 
     def _p_resolveConflict(self, oldstate, committed, newstate):
         # Apply the changes made in going from old to newstate to
