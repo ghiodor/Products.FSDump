@@ -82,7 +82,7 @@ class Dumper( SimpleItem ):
     def _setFSPath( self, fspath ):
         #   Canonicalize fspath.
         fspath = os.path.normpath( fspath )
-        if os.path.isabs( fspath ):
+        if not os.path.isabs( fspath ):
             raise "Dumper Error", "Path must be absolute."
         self.fspath = fspath
 
@@ -269,6 +269,82 @@ class Dumper( SimpleItem ):
             file.write( '%s\n' % column )
         file.close()
     
+    def _dumpZClass( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a ZClass) to the
+        #   filesystem as a directory, including propertysheets and
+        #   methods, as well as any nested ZClasses.
+        if path is None:
+            path = ''
+        path = os.path.join( path, obj.id )
+        file = self._createFile( path, '.properties' )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.write( 'metatype:string=%s\n' % obj._zclass_.meta_type )
+        file.write( 'bases:tokens=%s\n'
+                  % string.join( map( lambda klass: str(klass), obj._zbases )
+                               , ','
+                               )
+                  )
+        file.write( 'class_id:int=%s\n' % obj._zclass_.__module__ )
+        file.close()
+
+        #   XXX: dump icon here
+
+        #   Dump views
+        file = self._createFile( path, '.views' )
+        for view in obj.propertysheets.views.data():
+            file.write( '%s:%s\n' % ( view[ 'label' ], view[ 'action' ] ) )
+        file.close()
+
+        #   Dump property sheets.
+        sheetpath = os.path.join( path, 'propertysheets' , 'common' )
+        sheets = self._dumpObjects( obj.propertysheets.common.objectValues()
+                                  , sheetpath )
+        sheets.sort() # help diff out :)
+        file = self._createFile( sheetpath, '.objects' )
+        for id, meta in sheets:
+            file.write( '%s:%s\n' % ( id, meta ) )
+        file.close()
+
+        #   Dump methods
+        methodpath = os.path.join( path, 'propertysheets', 'methods' )
+        methods = self._dumpObjects( obj.propertysheets.methods.objectValues()
+                                   , methodpath )
+        methods.sort() # help diff out :)
+        file = self._createFile( methodpath, '.objects' )
+        for id, meta in methods:
+            file.write( '%s:%s\n' % ( id, meta ) )
+        file.close()
+    
+    def _dumpZClassPropertySheet( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a ZClass) to the
+        #   filesystem as a directory, including propertysheets and
+        #   methods, as well as any nested ZClasses.
+        file = self._createFile( path, '%s' % obj.id )
+        self._writeProperties( obj, file )
+        file.close()
+
+        file = self._createFile( path, '%s.properties' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.close()
+    
+    def _dumpPermission( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a Zope Permission) to the
+        #   filesystem as a .properties file.
+        file = self._createFile( path, '%s.properties' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.write( 'name:string=%s\n' % obj.name )
+        file.close()
+
+    def _dumpFactory( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a Zope Factory) to the
+        #   filesystem as a .properties file.
+        file = self._createFile( path, '%s.properties' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.write( 'object_type:string=%s\n' % obj.object_type )
+        file.write( 'initial:string=%s\n' % obj.initial )
+        file.write( 'permission:string=%s\n' % obj.permission )
+        file.close()
+
 
     _handlers = { 'DTML Method'     : _dumpDTMLMethod
                 , 'DTML Document'   : _dumpDTMLDocument
@@ -279,10 +355,12 @@ class Dumper( SimpleItem ):
                 , 'Python Method'   : _dumpPythonMethod
                 , 'Z SQL Method'    : _dumpSQLMethod
                 , 'ZCatalog'        : _dumpZCatalog
+                , 'Z Class'         : _dumpZClass
+                , 'Common Instance Property Sheet'
+                                    : _dumpZClassPropertySheet
+                , 'Zope Permission' : _dumpPermission
+                , 'Zope Factory'    : _dumpFactory
                #, 'SQL DB Conn'     : _dumpDBConn
-               #, 'ZClass'          : _dumpZClass
-               #, 'Permission'      : _dumpPermission
-               #, 'Factory'         : _dumpFactory
                #, 'Wizard'          : _dumpWizard
                #, 'WizardPage'      : _dumpWizardPage
                 }
