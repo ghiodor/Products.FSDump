@@ -311,7 +311,8 @@ class Dumper( SimpleItem ):
         text = "%s" % obj.src
         file.write(' <dtml-comment>\n')
         file.write( 'title:%s\n' % obj.title )
-        file.write( 'arguments: %s\n' % ' '.join(obj.arguments_src.splitlines() )
+        file.write( 'arguments: %s\n'
+                     % ' '.join(obj.arguments_src.splitlines() ) )
         file.write( 'connection_id:%s\n' % obj.connection_id )
         file.write( 'max_rows_:%s\n' % obj.max_rows_ )
         file.write( 'max_cache_:%s\n' % obj.max_cache_ )
