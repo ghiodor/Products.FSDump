@@ -10,12 +10,38 @@
 
   <dtml-if "q_size > 0">
 
-    <p><b>&dtml-q_size; item(s) queued.</b></p>
-    
+    <p><b>&dtml-q_size; item(s) queued.
+    <dtml-if view_queue>
+      <a href="&dtml-absolute_url;/manage_queue">Hide Queue &laquo;</a>
+    <dtml-else>
+      <a href="&dtml-absolute_url;/manage_queue?view_queue=1">View Queue &raquo;</a>
+    </dtml-if></b></p>
+
     <form action="manage_process">
       <input name="count" type="text" size="5" value="20">&nbsp;&nbsp;
       <input type="submit" value=" Process Queue " />
     </form>
+
+    <dtml-if view_queue>
+    <table width="100%" cellspacing="0" cellpadding="2" border="0">
+    <tr class="list-header"><th align="left">Queued Items</th></tr>
+    <dtml-in list_queue_items>
+      <dtml-let item="_['sequence-item']">
+        <tr class="row-<dtml-if
+            sequence-even>hilite<dtml-else>normal</dtml-if>"><td>
+          <dtml-try>
+            <a href="<dtml-var "restrictedTraverse(item).absolute_url()"
+                html_quote>/manage_workspace">&dtml-item;</a>
+          <dtml-except>
+            &dtml-item;
+          </dtml-try>
+        </td></tr>
+      </dtml-let>
+    <dtml-else>
+      <tr class="row-hilite"><td>Nothing in the queue.</td></tr>
+    </dtml-in>
+    </table>
+    </dtml-if>
 
   <dtml-else>
 

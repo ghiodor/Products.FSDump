@@ -392,10 +392,26 @@ class QueueCatalog(Implicit, SimpleItem):
                               'Properties+changed' % self.absolute_url())
 
 
+    security.declareProtected(manage_zcatalog_entries,
+        'list_queue_items')
+    def list_queue_items(self, limit=100):
+        """Return a list of items in the queue."""
+        items = []
+        count = 0
+        for queue in filter(None, self._queues):
+            qitems = queue._data.keys()
+            count += len(qitems)
+            items += qitems
+        if limit is not None:
+            if count > limit:
+                items = items[:limit]
+        return items
+
+
     security.declareProtected(manage_zcatalog_entries, 'manage_queue')
     manage_queue = DTMLFile('dtml/queue', globals())
 
-    security.declareProtected(manage_zcatalog_entries, 'manage_process')
+    security.declareProtected(manage_zcatalog_entries, 'manage_size')
     def manage_size(self):
         size = 0
         for q in self._queues:
