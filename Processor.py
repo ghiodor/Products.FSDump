@@ -37,7 +37,7 @@ class Processor:
                     application = Zope.app()
                 except:
                     LOG('QueuedCatalog', PANIC,
-                        "Could'nt connect to database",
+                        "Couldn't connect to database",
                         error=sys.exc_info())
                     break # No point in doing any more paths right now
                 else:
