@@ -47,6 +47,16 @@
     </tr>
 
     <tr>
+      <td align="left" valign="top" class="form-label">
+        Process removal events immediately
+      </td>
+      <td align="left" valign="top" colspan="3">
+        <input type="checkbox" name="immediate_removal"
+               tal:attributes="checked here/getImmediateRemoval" />
+      </td>
+    </tr>
+
+    <tr>
       <td>&nbsp;</td>
       <td colspan="3">
         <br>

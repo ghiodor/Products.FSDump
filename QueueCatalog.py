@@ -81,8 +81,11 @@ class QueueCatalog(Implicit, SimpleItem):
       
     """
 
+    security = ClassSecurityInformation()
+
     _immediate_indexes = ()  # The names of indexes to update immediately
     _location = None
+    _immediate_removal = 1   # Flag: don't queue removal
     title = ''
 
     # When set, _v_catalog_cache is a tuple containing the wrapped ZCatalog
@@ -125,6 +128,13 @@ class QueueCatalog(Implicit, SimpleItem):
 
     def setImmediateIndexes(self, indexes):
         self._immediate_indexes = tuple(map(str, indexes))
+
+
+    def getImmediateRemoval(self):
+        return self._immediate_removal
+
+    def setImmediateRemoval(self, flag):
+        self._immediate_removal = not not flag
 
 
     def getZCatalog(self, method=''):
@@ -229,6 +239,7 @@ class QueueCatalog(Implicit, SimpleItem):
         self._update(uid, event)
 
         if self._immediate_indexes:
+            # Update some of the indexes immediately.
             catalog.catalog_object(obj, uid, self._immediate_indexes)
 
 
@@ -241,6 +252,10 @@ class QueueCatalog(Implicit, SimpleItem):
             uid = '/'.join(uid)
 
         self._update(uid, REMOVED)
+
+        if self._immediate_removal:
+            self.process()
+
 
     def process(self):
         "Process pending events"
@@ -259,6 +274,32 @@ class QueueCatalog(Implicit, SimpleItem):
                     obj = catalog.unrestrictedTraverse(uid)
                     catalog.catalog_object(obj, uid)
 
+    #
+    # CMF catalog tool methods.
+    #
+    security.declarePrivate('indexObject')
+    def indexObject(self, object):
+        """Add to catalog.
+        """
+        self.catalog_object(object)
+
+    security.declarePrivate('unindexObject')
+    def unindexObject(self, object):
+        """Remove from catalog.
+        """
+        url = '/'.join(ob.getPhysicalPath())
+        self.uncatalog_object(url)
+
+    security.declarePrivate('reindexObject')
+    def reindexObject(self, object, idxs=[]):
+        """Update catalog after object data has changed.
+
+        The optional idxs argument is a list of specific indexes
+        to update (all of them by default).
+        """
+        # Punt for now and ignore idxs.
+        self.catalog_object(object)
+
     # Provide web pages. It would be nice to use views, but Zope 2.6
     # just isn't ready for views. :( In particular, we'd have to fake
     # out the PageTemplateFiles in some brittle way to make them do
@@ -270,11 +311,12 @@ class QueueCatalog(Implicit, SimpleItem):
         return self._location or ''
 
     def manage_edit(self, title='', location='', immediate_indexes=(),
-                    RESPONSE=None):
+                    immediate_removal=0, RESPONSE=None):
         """ Edit the instance """
         self.title = title
         self.setLocation(location or None)
         self.setImmediateIndexes(immediate_indexes)
+        self.setImmediateRemoval(immediate_removal)
 
         if RESPONSE is not None:
             RESPONSE.redirect('%s/manage_editForm?manage_tabs_message='
@@ -320,8 +362,6 @@ class QueueCatalog(Implicit, SimpleItem):
         +SimpleItem.manage_options
         )
 
-    security = ClassSecurityInformation()
-
     security.declareObjectPublic()
     # Disallow access to subobjects with no security assertions.
     security.setDefaultAccess('deny')
@@ -335,7 +375,8 @@ class QueueCatalog(Implicit, SimpleItem):
         'View management screens',
         'manage_editForm', 'manage_edit',
         'manage_queue', 'manage_getLocation',
-        'manage_size', 'getIndexInfo', 'getImmediateIndexes'
+        'manage_size', 'getIndexInfo', 'getImmediateIndexes',
+        'getImmediateRemoval',
         )
     
 def cataloged(catalog, path):
