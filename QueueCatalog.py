@@ -50,6 +50,7 @@ _zcatalog_methods = {
     'searchResults': 1,
     '__call__': 1,
     'refreshCatalog': 1,
+    'Indexes': 1,
     }
 
 _is_zcatalog_method = _zcatalog_methods.has_key
