@@ -284,8 +284,7 @@ class QueueCatalog(Implicit, SimpleItem):
         self._update(uid, REMOVED)
 
         if self._immediate_removal:
-            self.process()
-
+            self._process_queue(self._queues[hash(uid) % self._buckets], limit=None)
 
     security.declareProtected(manage_zcatalog_entries, 'process')
     def process(self, max=None):
@@ -294,29 +293,13 @@ class QueueCatalog(Implicit, SimpleItem):
             return 0
 
         count = 0
-        catalog = self.getZCatalog()
         for queue in filter(None, self._queues):
             limit = None
             if max:
                 # limit the number of events
                 limit = max - count
         
-            events = queue.process(limit)
-
-            for uid, (t, event) in events.items():
-                if event is REMOVED:
-                    if cataloged(catalog, uid):
-                        catalog.uncatalog_object(uid)
-                else:
-                    # add or change
-                    if event is CHANGED and not cataloged(catalog, uid):
-                        continue
-                    # Note that the uid may be relative to the catalog.
-                    obj = catalog.unrestrictedTraverse(uid, None)
-                    if obj is not None:
-                        catalog.catalog_object(obj, uid)
-
-                count = count + 1
+            count += self._process_queue(queue, limit)
 
             if max and count >= max:
                 # On reaching the maximum, return immediately
@@ -325,6 +308,30 @@ class QueueCatalog(Implicit, SimpleItem):
                 break
 
         return count
+
+    def _process_queue(self, queue, limit):
+        """Process a single queue"""
+        catalog = self.getZCatalog()
+        events = queue.process(limit)
+        count = 0
+
+        for uid, (t, event) in events.items():
+            if event is REMOVED:
+                if cataloged(catalog, uid):
+                    catalog.uncatalog_object(uid)
+            else:
+                # add or change
+                if event is CHANGED and not cataloged(catalog, uid):
+                    continue
+                # Note that the uid may be relative to the catalog.
+                obj = catalog.unrestrictedTraverse(uid, None)
+                if obj is not None:
+                    catalog.catalog_object(obj, uid)
+
+            count = count + 1
+
+        return count
+        
 
     #
     # CMF catalog tool methods.

@@ -114,6 +114,26 @@ class QueueCatalogTests(unittest.TestCase):
         ZCatalog.uidForObject = stupidUidMaker # monkey patch
         self.assertEqual(self.app.queue_cat.uidForObject(None), '/stupid/uid')
 
+    def testImmediateDeletion(self):
+        app = self.app
+        app.test_cat = QueueCatalog(1000)  # 1000 buckets. I don't want collisions here.
+        app.test_cat.id = 'test_cat'
+        app.test_cat.manage_edit(location='/real_cat',
+                                  immediate_indexes=['id'], immediate_removal=1)
+        for n in range(20):
+                f = Folder()
+                f.id = 'f%d' % n
+                setattr(app, f.id, f)
+                f = getattr(app, f.id)
+                app.test_cat.catalog_object(f)
+        self.assertEqual(app.test_cat.manage_size(), 20)
+        # "Delete" one. This should be processed immediately (including the add-event)
+        app.test_cat.uncatalog_object(getattr(app, 'f1').getPhysicalPath())
+        self.assertEqual(app.test_cat.manage_size(), 19)
+        del app.test_cat
+        
+
+
 # Enable this test when DemoStorage supports conflict resolution.
 
 ##    def testSimpleConflict(self):
