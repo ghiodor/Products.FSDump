@@ -26,7 +26,7 @@ from time import time
 from CatalogEventQueue import CatalogEventQueue, EVENT_TYPES, ADDED_EVENTS
 from CatalogEventQueue import ADDED, CHANGED, CHANGED_ADDED, REMOVED
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
-from Globals import HTMLFile
+from Globals import DTMLFile
 from Acquisition import Implicit
 
 StringType = type('')
@@ -208,22 +208,26 @@ class QueueCatalog(Implicit, SimpleItem):
     # out the PageTemplateFiles in some brittle way to make them do
     # the right thing. :(
 
-    manage_Delegation = HTMLFile('Delegation', globals())
+    manage_editForm = DTMLFile('dtml/edit', globals())
 
     def manage_getLocation(self):
         return self._location or ''
 
-    def manage_setDelegation(self, location, RESPONSE=None):
-        "Change the catalog delegated to"
+
+    def manage_edit(self, title='', location='', REQUEST=None):
+        """ Edit the instance """
+        self.title = title
         self.setLocation(location or None)
 
-        if RESPONSE is not None:
-            RESPONSE.redirect('manage_Delegation')
-
-        return location
+        if REQUEST is not None:
+            msg = 'Properties changed'
+            return self.manage_editForm( self
+                                       , REQUEST
+                                       , manage_tabs_message=msg
+                                       )
         
     
-    manage_Statistics = HTMLFile('Statistics', globals())
+    manage_queue = DTMLFile('dtml/queue', globals())
 
     def manage_size(self):
         size = 0
@@ -232,14 +236,18 @@ class QueueCatalog(Implicit, SimpleItem):
 
         return size
 
-    def manage_process(self, RESPONSE):
+    def manage_process(self, REQUEST):
         "Web UI to manually process queues"
-        
         # make sure we have necessary perm
         self.getZCatalog('catalog_object')
         self.getZCatalog('uncatalog_object')
         self.process()
-        RESPONSE.redirect('manage_Statistics')
+
+        msg = 'Queue processed'
+        return self.manage_queue( self
+                                , REQUEST
+                                , manage_tabs_message=msg
+                                )
     
     # Provide Zope 2 offerings
 
@@ -250,11 +258,11 @@ class QueueCatalog(Implicit, SimpleItem):
     __allow_access_to_unprotected_subobjects__ = 0
     manage_options=(
         (
-        {'label': 'Delegation', 'action': 'manage_Delegation',
-         'help':('QueueCatalog','QueueCatalog-Delegation.stx')},
+        {'label': 'Configure', 'action': 'manage_editForm',
+         'help':('QueueCatalog','QueueCatalog-Configure.stx')},
 
-        {'label': 'Statistics', 'action': 'manage_Statistics',
-         'help':('QueueCatalog','QueueCatalog-Statistics.stx')},
+        {'label': 'Queue', 'action': 'manage_queue',
+         'help':('QueueCatalog','QueueCatalog-Queue.stx')},
         )
         +SimpleItem.manage_options
         )
@@ -268,8 +276,8 @@ class QueueCatalog(Implicit, SimpleItem):
 
     security.declareProtected(
         'View management screens',
-        'manage_Delegation', 'manage_setDelegation',
-        'manage_Statistics', 'manage_getLocation',
+        'manage_editForm', 'manage_edit',
+        'manage_queue', 'manage_getLocation',
         'manage_size'
         )
     

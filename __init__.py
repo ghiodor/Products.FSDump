@@ -20,20 +20,19 @@ __version__='$$'[11:-2]
 # Placeholder for Zope Product data
 misc_ = {}
 
+from Globals import DTMLFile
 from QueueCatalog import QueueCatalog
-from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 
-manage_addQueueCatalogForm = PageTemplateFile(
-    'add.pt', globals(), __name__='manage_addQueueCatalogForm')
+manage_addQueueCatalogForm = DTMLFile('dtml/add', globals())
 
-
-def manage_addQueueCatalog(self, id, REQUEST=None):
+def manage_addQueueCatalog(self, id, title='', location=None, REQUEST=None):
     "Add a Catalog Queue"
     ob = QueueCatalog()
     ob.id = id
+    ob.manage_edit(title, location)
     self._setObject(id, ob)
-    if REQUEST is not None:
 
+    if REQUEST is not None:
         try:
             u = self.DestinationURL()
         except AttributeError:
@@ -46,7 +45,8 @@ def initialize(context):
         QueueCatalog,
         permission='Add ZCatalogs',
         constructors=(manage_addQueueCatalogForm, manage_addQueueCatalog, ),
-        icon='QueueCatalog.gif',
+        icon='www/QueueCatalog.gif',
         )
-    #context.registerHelp()
-    #context.registerHelpTitle('Zope Help')
+
+    context.registerHelp()
+    context.registerHelpTitle('Zope Help')
