@@ -18,7 +18,8 @@ $Id$
 import thread
 import Zope
 from time import sleep
-from zLOG import LOG, ERROR, PANIC
+import sys
+from zLOG import LOG, ERROR, PANIC, INFO
 
 class Processor:
     """Simple thread that processes queued catalog events
@@ -30,6 +31,7 @@ class Processor:
         thread.start_new_thread(self.live, ())
 
     def live(self):
+        LOG('QueuedCatalog', INFO, 'Set up to process queue entries')
         while 1:
             sleep(self._interval)
             for queue_catalog_path in self._queue_catalog_paths:
@@ -50,8 +52,10 @@ class Processor:
                         LOG('QueuedCatalog', ERROR, 'Queue processing failed',
                             error=sys.exc_info())
 
+                    else:
+                        LOG('QueuedCatalog', INFO, 'Processed queue')
+                    
                     application._p_jar.close()
-
 
 __doc__ = Processor.__doc__ + __doc__
 
