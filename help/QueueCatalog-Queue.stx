@@ -1,0 +1,13 @@
+QueueCatalog - Queue: View the number of queued catalog requests
+
+  Description
+
+    This view shows the number of queued catalog requests and, if
+    the queue is not empty, a form for immediate queue processing.
+
+
+  Controls
+
+    'Process Queue' -- Process all queued requests. This control
+      will only show up if requests are in the queue.
+

@@ -1,0 +1,23 @@
+QueueCatalog - Add: Create a new ZCatalog Queue
+
+  Description
+
+    A ZCatalog Queue is a drop-in replacement for a ZCatalog that
+    can queue cataloging requests. These queued requests can be 
+    processed manually or using a cron-like mechanism. 
+    
+    When the queues are processed the catalog requests will be 
+    sent to a *real* catalog, which real catalog this ends up
+    being can be configured into the ZCatalog Queue.
+
+
+  Controls
+
+    'ID' -- The ID for the ZCatalog Queue
+
+    'Title' -- An optional Title
+
+    'Catalog Instance' -- This is where the *real* catalog for
+      sending cataloging requests to can be selected.
+
+    'Add' -- Instantiates the ZCatalog Queue object

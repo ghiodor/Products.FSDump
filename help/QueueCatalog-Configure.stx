@@ -1,0 +1,16 @@
+QueueCatalog - Configure: Configure a ZCatalog Queue
+
+  Description
+
+    This view is used to edit the properties of a ZCatalog
+    Queue instance.
+
+
+  Controls
+
+    'Title' -- An optional Title
+
+    'Catalog Instance' -- This is where the *real* catalog for
+      sending cataloging requests to can be selected.
+
+    'Change' -- Commit the changes
