@@ -24,22 +24,22 @@
         Catalog location
       </td>
       <td align="left" valign="top" colspan="3">
-        <input name="location"
+        <input name="location" size="40"
                tal:attributes="value here/manage_getLocation" />
       </td>
     </tr>
 
     <tr tal:define="indexes here/getIndexInfo" tal:condition="indexes">
       <td align="left" valign="top"><div class="form-optional">
-         Indexes to defer
+         Indexes to update immediately
       </td>
       <td align="left" valign="top" colspan="3">
 
-<select name="deferred_indexes:list" multiple="multiple"
-  tal:define="deferred_indexes here/getDeferredIndexes">
+<select name="immediate_indexes:list" multiple="multiple"
+  tal:define="immediate_indexes here/getImmediateIndexes">
 <option tal:repeat="index_info indexes"
   tal:attributes="value index_info/id; selected python:
-  index_info['id'] in deferred_indexes"
+  index_info['id'] in immediate_indexes"
   tal:content="string: ${index_info/id} (${index_info/meta_type})"></option>
 </select>
 

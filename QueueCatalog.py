@@ -27,7 +27,7 @@ from CatalogEventQueue import CatalogEventQueue, EVENT_TYPES, ADDED_EVENTS
 from CatalogEventQueue import ADDED, CHANGED, CHANGED_ADDED, REMOVED
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from Globals import DTMLFile
-from Acquisition import Implicit
+from Acquisition import Implicit, aq_inner, aq_parent
 
 StringType = type('')
 
@@ -80,7 +80,7 @@ class QueueCatalog(Implicit, SimpleItem):
       
     """
 
-    _deferred_indexes = ()  # The names of indexes to defer
+    _immediate_indexes = ()  # The names of indexes to update immediately
     _location = None
     title = ''
 
@@ -119,11 +119,11 @@ class QueueCatalog(Implicit, SimpleItem):
                 res.append({'id': id, 'meta_type': meta_type})
             return res
 
-    def getDeferredIndexes(self):
-        return self._deferred_indexes
+    def getImmediateIndexes(self):
+        return self._immediate_indexes
 
-    def setDeferredIndexes(self, indexes):
-        self._deferred_indexes = tuple(map(str, indexes))
+    def setImmediateIndexes(self, indexes):
+        self._immediate_indexes = tuple(map(str, indexes))
 
 
     def getZCatalog(self, method=''):
@@ -144,7 +144,18 @@ class QueueCatalog(Implicit, SimpleItem):
                     "This QueueCatalog hasn't been "
                     "configured with a ZCatalog location."
                     )
-            ZC = self.unrestrictedTraverse(self._location)
+            parent = aq_parent(aq_inner(self))
+            try:
+                ZC = parent.unrestrictedTraverse(self._location)
+            except (KeyError, AttributeError):
+                raise QueueConfigurationError(
+                    "ZCatalog not found at %s." % self._location
+                    ) 
+            if not hasattr(ZC, 'getIndexObjects'):  # XXX need a better check
+                raise QueueConfigurationError(
+                    "The object at %s does not implement the "
+                    "IZCatalog interface." % self._location
+                    ) 
             self._v_catalog_cache = (ZC, REQUEST)
 
         security_manager = getSecurityManager()
@@ -187,14 +198,6 @@ class QueueCatalog(Implicit, SimpleItem):
 
         catalog = self.getZCatalog()
 
-        immediate_indexes = catalog.indexes()
-        # Choose which indexes to update.
-        for index in self._deferred_indexes:
-            try:
-                immediate_indexes.remove(index)
-            except ValueError:
-                pass
-
         # The ZCatalog API doesn't allow us to distinguish between
         # adds and updates, so we have to try to figure this out
         # ourselves.
@@ -210,22 +213,21 @@ class QueueCatalog(Implicit, SimpleItem):
 
         # Now, try to decide if the catalog has the uid (path).
 
-        if self._deferred_indexes:
-            if cataloged(catalog, uid):
+        if cataloged(catalog, uid):
+            event = CHANGED
+        else:
+            # Looks like we should add, but maybe there's already a
+            # pending add event. We'd better check the event queue:
+            if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
+                ADDED_EVENTS):
                 event = CHANGED
             else:
-                # Looks like we should add, but maybe there's already a
-                # pending add event. We'd better check the event queue:
-                if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
-                    ADDED_EVENTS):
-                    event = CHANGED
-                else:
-                    event = ADDED
+                event = ADDED
 
-            self._update(uid, event)
+        self._update(uid, event)
 
-        if immediate_indexes:
-            catalog.catalog_object(obj, uid, immediate_indexes)
+        if self._immediate_indexes:
+            catalog.catalog_object(obj, uid, self._immediate_indexes)
 
 
     def uncatalog_object(self, uid):
@@ -265,12 +267,12 @@ class QueueCatalog(Implicit, SimpleItem):
     def manage_getLocation(self):
         return self._location or ''
 
-    def manage_edit(self, title='', location='', deferred_indexes=(),
+    def manage_edit(self, title='', location='', immediate_indexes=(),
                     RESPONSE=None):
         """ Edit the instance """
         self.title = title
         self.setLocation(location or None)
-        self.setDeferredIndexes(deferred_indexes)
+        self.setImmediateIndexes(immediate_indexes)
 
         if RESPONSE is not None:
             RESPONSE.redirect('%s/manage_editForm?manage_tabs_message='
@@ -323,13 +325,13 @@ class QueueCatalog(Implicit, SimpleItem):
     security.setDefaultAccess('deny')
 
     security.declarePublic('catalog_object', 'uncatalog_object',
-                           'manage_process', 'getTitle')
+                           'manage_process', 'getTitle', 'title_or_id')
 
     security.declareProtected(
         'View management screens',
         'manage_editForm', 'manage_edit',
         'manage_queue', 'manage_getLocation',
-        'manage_size', 'getIndexInfo', 'getDeferredIndexes'
+        'manage_size', 'getIndexInfo', 'getImmediateIndexes'
         )
     
 def cataloged(catalog, path):
