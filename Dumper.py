@@ -82,7 +82,7 @@ class Dumper( SimpleItem ):
     def _setFSPath( self, fspath ):
         #   Canonicalize fspath.
         fspath = os.path.normpath( fspath )
-        if fspath[0] != '/':
+        if os.path.isabs( fspath ):
             raise "Dumper Error", "Path must be absolute."
         self.fspath = fspath
 
