@@ -87,7 +87,11 @@ class Dumper( SimpleItem ):
         if REQUEST and REQUEST.form.has_key( 'fspath' ):
             self._setFSPath( REQUEST.form[ 'fspath' ] )
 
-        self._dumpFolder( self.aq_parent )
+        parent = self.aq_parent.aq_base
+        if getattr(parent, 'isTopLevelPrincipiaApplicationObject', 0):
+            self._dumpRoot( self.aq_parent )
+        else:
+            self._dumpFolder( self.aq_parent )
 
         if REQUEST is not None:
             REQUEST['RESPONSE'].redirect( self.absolute_url()
@@ -185,6 +189,10 @@ class Dumper( SimpleItem ):
     #
     #   Type-specific dumpers
     #
+    security.declarePrivate( '_dumpRoot' )
+    def _dumpRoot( self, obj ):
+        self._dumpObjects( obj.objectValues() )
+
     security.declarePrivate( '_dumpFolder' )
     def _dumpFolder( self, obj, path=None ):
         #   Recurse to dump items in a folder.

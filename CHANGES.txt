@@ -1,5 +1,10 @@
 FSDump Change Log
 
+  After FSDump 0.8
+
+    * Applied patch from Willi Langenburger to enable dumping
+      directly from the Zope root object.
+
   FSDump 0.8 (2004/10/13)
 
     * Applied patch from Zope collector #1463 to make dumped SQL methods
