@@ -1,3 +1,8 @@
+2004-11-22  Christian Theune <ct@gocept.com>
+
+    * QueueCatalog.py: Made the immediate processing of 
+    DELETE-Requests more efficient.
+
 2003-05-30  Sidnei da Silva  <sidnei@x3ng.com>
 
 	* QueueCatalog.py (QueueCatalog.refreshCatalog): Added
