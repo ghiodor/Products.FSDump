@@ -1,9 +1,9 @@
 FSDump Change Log
 
-  After FSDump 0.8
+  FSDump 0.8.1 (2004/12/09)
 
-    * Applied patch from Willi Langenburger to enable dumping
-      directly from the Zope root object.
+    * Repackaged to nest the actual products directory inside a version-
+      qualified wrapper directory;  added an INSTALL.txt in the wrapper.
 
   FSDump 0.8 (2004/10/13)
 

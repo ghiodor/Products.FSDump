@@ -31,7 +31,7 @@ FSDump Product
 
   Installation
 
-    See the separate "installation directions":Help/INSTALL.stx.
+    See the separate "installation directions":INSTALL.txt.
 
   Usage
 

@@ -1,9 +1,0 @@
-Installing FSDump
-
- 1. Unpack the product into the 'Products' directory of your
-    Zope INSTANCE_HOME or SOFTWARE_HOME (see Evan Simpson's
-    "INSTANCE_HOME tutorial",
-    http://www.zope.org/Members/4am/instancehome ).
-    
- 2. Restart Zope;  verify that the FSDump product is present,
-    and not "broken", in your Control_Panel/Products folder.
