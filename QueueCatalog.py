@@ -363,12 +363,9 @@ class QueueCatalog(Implicit, SimpleItem):
         """Get a catalog uid for the object. Allows the underlying catalog
         to determine the uids if it implements this method"""
         catalog = self.getZCatalog()
-        try:
-            uidForObject = aq_base(catalog).uidForObject
-        except AttributeError:
-            return '/'.join(obj.getPhysicalPath())
-        else:
-            return uidForObject(obj)
+        if hasattr(aq_base(catalog), 'uidForObject'):
+            return catalog.uidForObject(obj)
+        return '/'.join(obj.getPhysicalPath())
 
     # Provide web pages. It would be nice to use views, but Zope 2.6
     # just isn't ready for views. :( In particular, we'd have to fake
