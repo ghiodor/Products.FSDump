@@ -43,7 +43,7 @@ class Processor:
                 else:
 
                     try:
-                        queue_catalog = app.unrestrictedTraverse(
+                        queue_catalog = application.unrestrictedTraverse(
                             queue_catalog_path)
                         queue_catalog.process()
                     except:
