@@ -20,6 +20,7 @@ from ExtensionClass import Base
 from OFS.SimpleItem import SimpleItem
 from AccessControl.SecurityManagement import getSecurityManager
 from AccessControl.SecurityInfo import ClassSecurityInformation
+from AccessControl.Permissions import manage_zcatalog_entries
 from OFS.SimpleItem import SimpleItem
 from BTrees.OOBTree import OOBTree
 from time import time
@@ -27,7 +28,7 @@ from CatalogEventQueue import CatalogEventQueue, EVENT_TYPES, ADDED_EVENTS
 from CatalogEventQueue import ADDED, CHANGED, CHANGED_ADDED, REMOVED
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from Globals import DTMLFile
-from Acquisition import Implicit, aq_inner, aq_parent
+from Acquisition import Implicit, aq_base, aq_inner, aq_parent
 
 StringType = type('')
 
@@ -128,7 +129,7 @@ class QueueCatalog(Implicit, SimpleItem):
 
     def getZCatalog(self, method=''):
         ZC = None
-        REQUEST = self.REQUEST
+        REQUEST = getattr(self, 'REQUEST', None)
         cache = self._v_catalog_cache
         if cache is not None:
             # The cached catalog may be wrapped with an earlier
@@ -155,20 +156,21 @@ class QueueCatalog(Implicit, SimpleItem):
                 raise QueueConfigurationError(
                     "The object at %s does not implement the "
                     "IZCatalog interface." % self._location
-                    ) 
+                    )
+
+            security_manager = getSecurityManager()
+            if not security_manager.validateValue(ZC):
+                raise Unauthorized(self._location, ZC)
+
+            ZC = aq_base(ZC).__of__(parent)
             self._v_catalog_cache = (ZC, REQUEST)
-
-        security_manager = getSecurityManager()
-
-        if not security_manager.validateValue(ZC):
-            raise Unauthorized(self._location, ZC)
 
         if method:
             if not _is_zcatalog_method(method):
                 raise AttributeError(method)
             m = getattr(ZC, method)
-            if not security_manager.validateValue(m):
-                raise Unauthorized(name=method)
+            # Note that permission to access the method may be checked
+            # later on.  This isn't the right place to check permission.
             return m
         else:
             return ZC
@@ -324,8 +326,10 @@ class QueueCatalog(Implicit, SimpleItem):
     # Disallow access to subobjects with no security assertions.
     security.setDefaultAccess('deny')
 
-    security.declarePublic('catalog_object', 'uncatalog_object',
-                           'manage_process', 'getTitle', 'title_or_id')
+    security.declarePublic('manage_process', 'getTitle', 'title_or_id')
+
+    security.declareProtected(manage_zcatalog_entries,
+                              'catalog_object', 'uncatalog_object')
 
     security.declareProtected(
         'View management screens',
