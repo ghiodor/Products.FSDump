@@ -307,20 +307,21 @@ class Dumper( SimpleItem ):
     def _dumpSQLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a SQL Method) to the
         #   filesystem as a file, with the accompanyting properties file.
-        file = self._createFile( path, '%s.sql' % obj.id )
-        text = "%s\n\n%s" % ( obj.arguments_src, obj.src )
+        file = self._createFile( path, '%s.zsql' % obj.id )
+        text = "%s" % obj.src
+        file.write(' <dtml-comment>\n')
+        file.write( 'title:%s\n' % obj.title )
+        file.write( 'arguments: %s\n' % ' '.join(obj.arguments_src.splitlines() )
+        file.write( 'connection_id:%s\n' % obj.connection_id )
+        file.write( 'max_rows_:%s\n' % obj.max_rows_ )
+        file.write( 'max_cache_:%s\n' % obj.max_cache_ )
+        file.write( 'cache_time_:%s\n' % obj.cache_time_ )
+        file.write( 'class_name_:%s\n' % obj.class_name_ )
+        file.write( 'class_file_:%s\n' % obj.class_file_ )
+        file.write( '</dtml-comment>\n')
         if text[-1] != '\n':
             text = '%s\n' % text
         file.write( text )
-        file.close()
-        file = self._createMetadataFile( path, '%s.sql' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'connection_id:string=%s\n' % obj.connection_id )
-        file.write( 'max_rows_:int=%s\n' % obj.max_rows_ )
-        file.write( 'max_cache_:int=%s\n' % obj.max_cache_ )
-        file.write( 'cache_time_:int=%s\n' % obj.cache_time_ )
-        file.write( 'class_name_:string=%s\n' % obj.class_name_ )
-        file.write( 'class_file_:string=%s\n' % obj.class_file_ )
         file.close()
 
     security.declarePrivate( '_dumpZCatalog' )
