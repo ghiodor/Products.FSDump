@@ -287,7 +287,7 @@ class QueueCatalog(Implicit, SimpleItem):
     def unindexObject(self, object):
         """Remove from catalog.
         """
-        url = '/'.join(ob.getPhysicalPath())
+        url = '/'.join(object.getPhysicalPath())
         self.uncatalog_object(url)
 
     security.declarePrivate('reindexObject')
