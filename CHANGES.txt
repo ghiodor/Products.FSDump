@@ -1,0 +1,20 @@
+FSDump Change Log
+=================
+
+ 0.2 (2000/11/19)
+
+  * Add handlers for:
+
+    - ZClasses
+
+    - ZClass property sheets
+
+    - TTW Permissions
+
+    - TTW Factories
+
+  * Fix unixism in 'Dumper._setFSPath()' -- thanks Craig! (cba@mediaone.net)
+
+ 0.1 (2000/11/16)
+
+  * Initial release
