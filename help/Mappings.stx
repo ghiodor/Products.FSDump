@@ -30,6 +30,12 @@ Mapping TTW Code to the Filesystem
         - Create a module containing a single top-level function
           definition, using the name, argument list, and body.
 
+    'Python Script'
+
+        - Create a module containing a single top-level function
+          definition, using the "read" format (bindings in comments
+          at the top).
+
     'File' / 'Image'
 
         - Save the file contents themselves in binary format using
