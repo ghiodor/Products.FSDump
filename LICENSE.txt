@@ -1,3 +1,3 @@
 FSDump is licensed acording to the terms of the "Zope Public License
-(ZPL) Version 1.0", http://www.zope.org/manage_copyright.
+(ZPL) Version 2.1", http://www.zope.org/Resources/License
 
