@@ -2,14 +2,14 @@
 #
 # Copyright (c) 2002 Zope Corporation and Contributors.
 # All Rights Reserved.
-# 
+#
 # This software is subject to the provisions of the Zope Public License,
 # Version 2.0 (ZPL).  A copy of the ZPL should accompany this distribution.
 # THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
 # WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
 # FOR A PARTICULAR PURPOSE.
-# 
+#
 ##############################################################################
 """
 $Id$
@@ -82,7 +82,7 @@ class QueueCatalog(Implicit, SimpleItem):
 
     - When used with ZEO, indexing might e performed on the same
       machine as the storage server, making updates faster.
-      
+
     """
 
     security = ClassSecurityInformation()
@@ -176,7 +176,7 @@ class QueueCatalog(Implicit, SimpleItem):
             except (KeyError, AttributeError):
                 raise QueueConfigurationError(
                     "ZCatalog not found at %s." % self._location
-                    ) 
+                    )
             if not hasattr(ZC, 'getIndexObjects'):  # XXX need a better check
                 raise QueueConfigurationError(
                     "The object at %s does not implement the "
@@ -203,7 +203,7 @@ class QueueCatalog(Implicit, SimpleItem):
     def __getattr__(self, name):
         # The original object must be wrapped, but self isn't, so
         # we return a special object that will do the attribute access
-        # on a wrapped object. 
+        # on a wrapped object.
         if _is_zcatalog_method(name):
             return AttrWrapper(name)
 
@@ -212,12 +212,12 @@ class QueueCatalog(Implicit, SimpleItem):
     def _update(self, uid, etype):
         t = time()
         self._queues[hash(uid) % self._buckets].update(uid, etype)
-        
+
     def catalog_object(self, obj, uid=None):
 
         # Make sure the current context is allowed to to this:
         catalog_object = self.getZCatalog('catalog_object')
-        
+
         if uid is None:
             uid = '/'.join(obj.getPhysicalPath())
         elif not isinstance(uid, StringType):
@@ -236,7 +236,7 @@ class QueueCatalog(Implicit, SimpleItem):
         # To avoid this, we need to make sure we see consistent values
         # of the event queue. We also need to avoid resolving
         # (non-undo) conflicts of add events. This will slow things
-        # down a bit, but adds should be relatively infrequent. 
+        # down a bit, but adds should be relatively infrequent.
 
         # Now, try to decide if the catalog has the uid (path).
 
@@ -270,7 +270,6 @@ class QueueCatalog(Implicit, SimpleItem):
 
         if self._immediate_removal:
             self.process()
-
 
     def process(self, max=None):
         """Process pending events
@@ -326,6 +325,23 @@ class QueueCatalog(Implicit, SimpleItem):
         # Punt for now and ignore idxs.
         self.catalog_object(object)
 
+    def refreshCatalog(self, clear=0):
+        """ re-index everything we can find """
+
+        zc = self.getZCatalog()
+        cat = zc._catalog
+        paths = cat.paths.values()
+        if clear:
+            paths = tuple(paths)
+            cat.clear()
+
+        for p in paths:
+            obj = zc.resolve_path(p)
+            if not obj:
+                obj = zc.resolve_url(p, self.REQUEST)
+            if obj is not None:
+                self.catalog_object(obj, p)
+
     # Provide web pages. It would be nice to use views, but Zope 2.6
     # just isn't ready for views. :( In particular, we'd have to fake
     # out the PageTemplateFiles in some brittle way to make them do
@@ -351,8 +367,8 @@ class QueueCatalog(Implicit, SimpleItem):
         if RESPONSE is not None:
             RESPONSE.redirect('%s/manage_editForm?manage_tabs_message='
                               'Properties+changed' % self.absolute_url())
-        
-    
+
+
     manage_queue = DTMLFile('dtml/queue', globals())
 
     def manage_size(self):
@@ -371,7 +387,7 @@ class QueueCatalog(Implicit, SimpleItem):
 
         msg = 'Queue processed'
         return self.manage_queue(manage_tabs_message=msg)
-    
+
     # Provide Zope 2 offerings
 
     index_html = None
@@ -396,7 +412,7 @@ class QueueCatalog(Implicit, SimpleItem):
     security.declarePublic('manage_process', 'getTitle', 'title_or_id')
 
     security.declareProtected(manage_zcatalog_entries,
-                              'catalog_object', 'uncatalog_object')
+                              'catalog_object', 'uncatalog_object', 'refreshCatalog')
 
     security.declareProtected(
         'View management screens',
@@ -405,19 +421,19 @@ class QueueCatalog(Implicit, SimpleItem):
         'manage_size', 'getIndexInfo', 'getImmediateIndexes',
         'getImmediateRemoval', 'getBucketCount', 'setBucketCount',
         )
-    
+
 def cataloged(catalog, path):
     getrid = getattr(catalog, 'getrid', None)
     if getrid is None:
-        
+
         # This is an old catalog that doesn't provide an API for
         # getting an objects rid (and thus determing that the
         # object is already cataloged.
-        
+
         # We'll just use our knowledge of the internal structure.
-        
+
         rid = catalog._catalog.uids.get(path)
-        
+
     else:
         rid = catalog.getrid(path)
 
