@@ -1,0 +1,9 @@
+<html><head></head><body>
+
+<form action="manage_addQueueCatalog">
+  Enter an id: <input name="id">
+  <br>
+  <input type="submit" value="Add" />
+</form>
+
+</body></html>
