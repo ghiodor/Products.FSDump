@@ -1,0 +1,80 @@
+Overview
+
+ The tarball for this product does *not* unpack to
+ 'lib/python/FSDump';  rather it unpacks to
+ 'FSDump-x.x'.  I made this choice for two reasons:
+
+  * More and more Zope installations are using an
+    'INSTANCE_HOME' layout, which divides the "core"
+    Zope software (installed in '$SOFTWARE_HOME') from
+    the products and data specific to a particular
+    Zope instance (installed in '$INSTANCE_HOME').
+    '$INSTANCE_HOME' does not put products into a
+    'lib/python/Products' directory, but simply into
+    'Products'.  See Evan Simpson's "INSTANCE_HOME
+    how-to":/Members/4am/instancehome for more.
+
+
+  * I am finding it needful to maintain multiple versions
+    of some products on my filesystem, and to switch
+    easily among them.  I therefore want each version to
+    be in a separate directory, with the version mangled
+    into the name.
+
+Installing into 'SOFTWARE_HOME'
+
+ If you are not using 'INSTANCE_HOME', and just want the
+ product to be installed into the 'lib/python/Products'
+ directory:
+
+  1. Unpack the product into a temporary directory.  It
+     will create a directory, 'FSDump-x.y'.
+
+  2. Move this directory into the 'lib/python/Products'
+     directory of you Zope '$SOFTWARE_HOME'.
+
+  3. Rename it to 'FSDump'.
+
+  4. Restart Zope.
+
+ If you'd like to maintain the version numbered directory
+ somewhere (on a Unix-style filesystem):
+
+  1. Unpack the product into the directory where you keep
+     product tarballs.  It will create a directory,
+     'FSDump-x.y'.
+
+  2. Symlink this directory into the 'lib/python/Products'
+     directory of you Zope '$SOFTWARE_HOME', naming the
+     link 'FSDump'.
+
+  3. Restart Zope.
+
+Installing into 'INSTANCE_HOME'
+
+ If you *are* using 'INSTANCE_HOME', and just want the
+ product to be installed into the 'Products'
+ directory:
+
+  1. Unpack the product into a temporary directory.  It
+     will create a directory, 'FSDump-x.y'.
+
+  2. Move this directory into the 'Products'
+     directory of you Zope '$INSTANCE_HOME'.
+
+  3. Rename it to 'FSDump'.
+
+  4. Restart Zope.
+
+ If you'd like to maintain the version numbered directory
+ somewhere (on a Unix-style filesystem):
+
+  1. Unpack the product into the directory where you keep
+     product tarballs.  It will create a directory,
+     'FSDump-x.y'.
+
+  2. Symlink this directory into the 'Products'
+     directory of you Zope '$INSTANCE_HOME', naming the
+     link 'FSDump'.
+
+  3. Restart Zope.

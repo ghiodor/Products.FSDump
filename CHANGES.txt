@@ -1,6 +1,16 @@
 FSDump Change Log
 =================
 
+ 0.3 (2001/01/08)
+
+  * Add handlers for:
+
+    - ZClasses
+
+    - ZClass property sheets
+
+  * Include icon in ZClass dump (as '.icon' file).
+
  0.2 (2000/11/19)
 
   * Add handlers for:
