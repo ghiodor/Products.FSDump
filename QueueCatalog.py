@@ -48,6 +48,7 @@ _zcatalog_methods = {
     'index_objects': 1,
     'searchResults': 1,
     '__call__': 1,
+    'refreshCatalog': 1,
     }
 
 _is_zcatalog_method = _zcatalog_methods.has_key
@@ -324,23 +325,6 @@ class QueueCatalog(Implicit, SimpleItem):
         """
         # Punt for now and ignore idxs.
         self.catalog_object(object)
-
-    def refreshCatalog(self, clear=0):
-        """ re-index everything we can find """
-
-        zc = self.getZCatalog()
-        cat = zc._catalog
-        paths = cat.paths.values()
-        if clear:
-            paths = tuple(paths)
-            cat.clear()
-
-        for p in paths:
-            obj = zc.resolve_path(p)
-            if not obj:
-                obj = zc.resolve_url(p, self.REQUEST)
-            if obj is not None:
-                self.catalog_object(obj, p)
 
     # Provide web pages. It would be nice to use views, but Zope 2.6
     # just isn't ready for views. :( In particular, we'd have to fake
