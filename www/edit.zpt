@@ -57,6 +57,16 @@
     </tr>
 
     <tr>
+      <td align="left" valign="top" class="form-label">
+        Bucket count
+      </td>
+      <td align="left" valign="top" colspan="3">
+        <input type="text" name="bucket_count"
+               tal:attributes="value here/getBucketCount" />
+      </td>
+    </tr>
+
+    <tr>
       <td>&nbsp;</td>
       <td colspan="3">
         <br>

@@ -29,7 +29,7 @@ def manage_addQueueCatalog(self, id, title='', location=None, REQUEST=None):
     "Add a Catalog Queue"
     ob = QueueCatalog()
     ob.id = id
-    ob.manage_edit(title, location)
+    ob.manage_edit(title, location, immediate_removal=1)
     self._setObject(id, ob)
 
     if REQUEST is not None:

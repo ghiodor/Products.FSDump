@@ -14,7 +14,11 @@
 """
 $Id$
 """
+# Python std. lib
+from time import time
+from types import StringType
 
+# Other packages
 from zExceptions import Unauthorized
 from ExtensionClass import Base
 from OFS.SimpleItem import SimpleItem
@@ -23,13 +27,14 @@ from AccessControl.SecurityInfo import ClassSecurityInformation
 from AccessControl.Permissions import manage_zcatalog_entries
 from OFS.SimpleItem import SimpleItem
 from BTrees.OOBTree import OOBTree
-from time import time
-from CatalogEventQueue import CatalogEventQueue, EVENT_TYPES, ADDED_EVENTS
-from CatalogEventQueue import ADDED, CHANGED, CHANGED_ADDED, REMOVED
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from Globals import DTMLFile
 from Acquisition import Implicit, aq_base, aq_inner, aq_parent
-from types import StringType
+
+# Local
+from CatalogEventQueue import CatalogEventQueue, EVENT_TYPES, ADDED_EVENTS
+from CatalogEventQueue import ADDED, CHANGED, CHANGED_ADDED, REMOVED
+
 
 _zcatalog_methods = {
     'catalog_object': 1,
@@ -122,6 +127,7 @@ class QueueCatalog(Implicit, SimpleItem):
                 res.append({'id': id, 'meta_type': meta_type})
             return res
 
+
     def getImmediateIndexes(self):
         return self._immediate_indexes
 
@@ -134,6 +140,16 @@ class QueueCatalog(Implicit, SimpleItem):
 
     def setImmediateRemoval(self, flag):
         self._immediate_removal = not not flag
+
+
+    def getBucketCount(self):
+        return self._buckets
+
+    def setBucketCount(self, count):
+        if self._location:
+            self.process()
+        self._buckets = int(count)
+        self._clearQueues()
 
 
     def getZCatalog(self, method=''):
@@ -239,10 +255,7 @@ class QueueCatalog(Implicit, SimpleItem):
 
         if self._immediate_indexes:
             # Update some of the indexes immediately.
-            try:
-                catalog.catalog_object(obj, uid, self._immediate_indexes)
-            except:
-                pass
+            catalog.catalog_object(obj, uid, self._immediate_indexes)
 
 
     def uncatalog_object(self, uid):
@@ -274,11 +287,7 @@ class QueueCatalog(Implicit, SimpleItem):
                         continue
                     # Note that the uid may be relative to the catalog.
                     obj = catalog.unrestrictedTraverse(uid)
-                    try:
-                        catalog.catalog_object(obj, uid)
-                    except:
-                        # Something went wrong, put back in the queue
-                        self._update(uid, event)
+                    catalog.catalog_object(obj, uid)
 
     #
     # CMF catalog tool methods.
@@ -317,12 +326,16 @@ class QueueCatalog(Implicit, SimpleItem):
         return self._location or ''
 
     def manage_edit(self, title='', location='', immediate_indexes=(),
-                    immediate_removal=0, RESPONSE=None):
+                    immediate_removal=0, bucket_count=0, RESPONSE=None):
         """ Edit the instance """
         self.title = title
         self.setLocation(location or None)
         self.setImmediateIndexes(immediate_indexes)
         self.setImmediateRemoval(immediate_removal)
+        if bucket_count:
+            bucket_count = int(bucket_count)
+            if bucket_count != self.getBucketCount():
+                self.setBucketCount(bucket_count)
 
         if RESPONSE is not None:
             RESPONSE.redirect('%s/manage_editForm?manage_tabs_message='
@@ -379,7 +392,7 @@ class QueueCatalog(Implicit, SimpleItem):
         'manage_editForm', 'manage_edit',
         'manage_queue', 'manage_getLocation',
         'manage_size', 'getIndexInfo', 'getImmediateIndexes',
-        'getImmediateRemoval',
+        'getImmediateRemoval', 'getBucketCount', 'setBucketCount',
         )
     
 def cataloged(catalog, path):
