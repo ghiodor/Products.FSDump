@@ -29,8 +29,7 @@ from CatalogEventQueue import ADDED, CHANGED, CHANGED_ADDED, REMOVED
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from Globals import DTMLFile
 from Acquisition import Implicit, aq_base, aq_inner, aq_parent
-
-StringType = type('')
+from types import StringType
 
 _zcatalog_methods = {
     'catalog_object': 1,
@@ -205,7 +204,7 @@ class QueueCatalog(Implicit, SimpleItem):
         
         if uid is None:
             uid = '/'.join(obj.getPhysicalPath())
-        elif type(uid) is not StringType:
+        elif not isinstance(uid, StringType):
             uid = '/'.join(uid)
 
         catalog = self.getZCatalog()
@@ -240,7 +239,10 @@ class QueueCatalog(Implicit, SimpleItem):
 
         if self._immediate_indexes:
             # Update some of the indexes immediately.
-            catalog.catalog_object(obj, uid, self._immediate_indexes)
+            try:
+                catalog.catalog_object(obj, uid, self._immediate_indexes)
+            except:
+                pass
 
 
     def uncatalog_object(self, uid):
@@ -248,7 +250,7 @@ class QueueCatalog(Implicit, SimpleItem):
         # Make sure the current context is allowed to to this:
         self.getZCatalog('uncatalog_object')
 
-        if type(uid) is not StringType:
+        if not isinstance(uid, StringType):
             uid = '/'.join(uid)
 
         self._update(uid, REMOVED)
@@ -272,7 +274,11 @@ class QueueCatalog(Implicit, SimpleItem):
                         continue
                     # Note that the uid may be relative to the catalog.
                     obj = catalog.unrestrictedTraverse(uid)
-                    catalog.catalog_object(obj, uid)
+                    try:
+                        catalog.catalog_object(obj, uid)
+                    except:
+                        # Something went wrong, put back in the queue
+                        self._update(uid, event)
 
     #
     # CMF catalog tool methods.
@@ -340,10 +346,7 @@ class QueueCatalog(Implicit, SimpleItem):
         self.process()
 
         msg = 'Queue processed'
-        return self.manage_queue( self
-                                , REQUEST
-                                , manage_tabs_message=msg
-                                )
+        return self.manage_queue(manage_tabs_message=msg)
     
     # Provide Zope 2 offerings
 
