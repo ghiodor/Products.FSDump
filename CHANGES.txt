@@ -1,5 +1,11 @@
 FSDump Change Log
 
+  0.5 (2001/08/03)
+
+    * Add handlers for:
+
+      - PythonScript
+
   0.4 (2001/06/18)
 
     * Conform to the "Finished Project Guidelines",
