@@ -99,6 +99,45 @@ FSDump Product
 
     - Store the schema in a "<id>.metadata" file, one line per
       field name.
+
+   'ZClass'
+
+    - Map to a directory.
+
+    - Store "basic" tab values in '.properties'
+
+    - Store icon in '.icon'
+
+    - Store propertysheets in 'propertysheets/common'.
+
+    - Store method tab objects (includin nested ZClasses)
+      in 'propertysheets/methods'.
+
+   'Common Instance Property Sheet' (ZClass property sheet)
+
+    - Store properties as name:type=value in file of same name.
+
+   'Zope Permission'
+
+    - Store values in "*.properties".
+
+   'Zope Factory'
+
+    - Store values in "*.properties".
+
+   'Wizard'
+
+    - Map to a directory.
+
+    - Store properties in '.properties'.
+
+    - Store pages.
+
+   'WizardPage'
+
+    - Store text in "*.wizardpage'.
+
+    - Store properties in '*.properties'.
    
  Known Issues
 
@@ -110,16 +149,6 @@ FSDump Product
   * Finish out the typelist for "standard" metatypes:
 
     - Database connectors
-
-    - ZClass
-
-    - Permission
-
-    - Factory
-
-    - Wizard
-
-    - WizardPage
 
   * Integrate with the HelpSystem.
 
@@ -133,5 +162,5 @@ FSDump Product
 
   * Make the dumper easier to extend (e.g., by adding
     *more* TTW code to emit FS code ;), or by registering
-    handlers for new metatypes.)L
+    handlers for new metatypes.)
 

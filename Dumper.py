@@ -162,11 +162,11 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
 
-    def _dumpDTML( self, obj, path=None ):
+    def _dumpDTML( self, obj, path=None, suffix='dtml' ):
         #   Dump obj (assumed to be a DTML Method/Document) to the
         #   filesystem as a file, appending ".dtml" to the name.
         peer_id = obj.id()
-        file = self._createFile( path, '%s.dtml' % peer_id )
+        file = self._createFile( path, '%s.%s' % ( peer_id, suffix ) )
         text = obj.raw
         if text[-1] != '\n':
             text = '%s\n' % text
@@ -287,7 +287,17 @@ class Dumper( SimpleItem ):
         file.write( 'class_id:int=%s\n' % obj._zclass_.__module__ )
         file.close()
 
-        #   XXX: dump icon here
+        #   Dump icon
+        file = self._createFile( path, '.icon', 'wb' )
+        img = obj._zclass_.ziconImage
+        data = img.data
+        if type( data ) == type( '' ):
+            file.write( data )
+        else:
+            while data is not None:
+                file.write( data.data )
+                data = data.next
+        file.close()
 
         #   Dump views
         file = self._createFile( path, '.views' )
@@ -345,6 +355,37 @@ class Dumper( SimpleItem ):
         file.write( 'permission:string=%s\n' % obj.permission )
         file.close()
 
+    def _dumpWizard( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a Wizard) to the
+        #   filesystem as a directory, containing a .properties file
+        #   and analogues for the pages.
+        if path is None:
+            path = ''
+        path = os.path.join( path, obj.id )
+        file = self._createFile( path, '.properties' )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.write( 'description:text=[[%s]]\n' % obj.description )
+        file.write( 'wizard_action:string=%s\n' % obj.wizard_action )
+        file.write( 'wizard_icon:string=%s\n' % obj.wizard_icon )
+        file.write( 'wizard_hide_title:int=%s\n' % obj.wizard_hide_title )
+        file.write( 'wizard_stepcount:int=%s\n' % obj.wizard_stepcount )
+        file.close()
+
+        pages = self._dumpObjects( obj.objectValues(), path )
+
+        pages.sort() # help diff out :)
+        file = self._createFile( path, '.objects' )
+        for id, meta in pages:
+            file.write( '%s:%s\n' % ( id, meta ) )
+        file.close()
+
+    def _dumpWizardPage( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a WizardPage) to the
+        #   filesystem as a file, appending ".wizardpage" to the name.
+        self._dumpDTML( obj, path, 'wizardpage' )
+        file = self._createFile( path, '%s.properties' % obj.id() )
+        self._writeProperties( obj, file )
+        file.close()
 
     _handlers = { 'DTML Method'     : _dumpDTMLMethod
                 , 'DTML Document'   : _dumpDTMLDocument
@@ -360,9 +401,9 @@ class Dumper( SimpleItem ):
                                     : _dumpZClassPropertySheet
                 , 'Zope Permission' : _dumpPermission
                 , 'Zope Factory'    : _dumpFactory
+                , 'Wizard'          : _dumpWizard
+                , 'Wizard Page'     : _dumpWizardPage
                #, 'SQL DB Conn'     : _dumpDBConn
-               #, 'Wizard'          : _dumpWizard
-               #, 'WizardPage'      : _dumpWizardPage
                 }
 
     def testDump( self, peer_path, path=None, REQUEST=None ):
