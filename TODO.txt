@@ -1,7 +1,8 @@
 FSDump ToDo's
 
-  ( ) Target .metadata file expected by newer CMF releases.
-      (in the '[Default]' section).
+  (x) Target .metadata file expected by newer CMF releases.
+      (in the '[Default]' section);  write '.objects' entries into its
+      '[Objects]' section.
 
   ( ) Map the permission-role map in the '[Permissions]' section of the
       companion ".metadata" file (XXX this feature not present before

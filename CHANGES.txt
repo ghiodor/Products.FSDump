@@ -2,7 +2,13 @@ FSDump Change Log
 
   0.7 (2004/05/17)
 
-    * TBA
+    * Added knob to force use of single '.metadata' file, rather than
+      multiples (CMF 1.4 compatibility).
+
+    * Migrated ZMI to use PageTemplates.
+
+    * Bug:  when synthesizing a file extension, Dumper didn't include the
+      synthesized extension in the name of the "companion" properties file.
 
   0.6 (2001/08/09)
 

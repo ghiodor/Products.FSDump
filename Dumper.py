@@ -1,105 +1,36 @@
 ##############################################################################
-# 
-# Zope Public License (ZPL) Version 1.0
-# -------------------------------------
-# 
-# Copyright (c) Digital Creations.  All rights reserved.
-# 
-# This license has been certified as Open Source(tm).
-# 
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-# 
-# 1. Redistributions in source code must retain the above copyright
-#    notice, this list of conditions, and the following disclaimer.
-# 
-# 2. Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions, and the following disclaimer in
-#    the documentation and/or other materials provided with the
-#    distribution.
-# 
-# 3. Digital Creations requests that attribution be given to Zope
-#    in any manner possible. Zope includes a "Powered by Zope"
-#    button that is installed by default. While it is not a license
-#    violation to remove this button, it is requested that the
-#    attribution remain. A significant investment has been put
-#    into Zope, and this effort will continue if the Zope community
-#    continues to grow. This is one way to assure that growth.
-# 
-# 4. All advertising materials and documentation mentioning
-#    features derived from or use of this software must display
-#    the following acknowledgement:
-# 
-#      "This product includes software developed by Digital Creations
-#      for use in the Z Object Publishing Environment
-#      (http://www.zope.org/)."
-# 
-#    In the event that the product being advertised includes an
-#    intact Zope distribution (with copyright and license included)
-#    then this clause is waived.
-# 
-# 5. Names associated with Zope or Digital Creations must not be used to
-#    endorse or promote products derived from this software without
-#    prior written permission from Digital Creations.
-# 
-# 6. Modified redistributions of any form whatsoever must retain
-#    the following acknowledgment:
-# 
-#      "This product includes software developed by Digital Creations
-#      for use in the Z Object Publishing Environment
-#      (http://www.zope.org/)."
-# 
-#    Intact (re-)distributions of any official Zope release do not
-#    require an external acknowledgement.
-# 
-# 7. Modifications are encouraged but must be packaged separately as
-#    patches to official Zope releases.  Distributions that do not
-#    clearly separate the patches from the original work must be clearly
-#    labeled as unofficial distributions.  Modifications which do not
-#    carry the name Zope may be packaged in any form, as long as they
-#    conform to all of the clauses above.
-# 
-# 
-# Disclaimer
-# 
-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-#   SUCH DAMAGE.
-# 
-# 
-# This software consists of contributions made by Digital Creations and
-# many individuals on behalf of Digital Creations.  Specific
-# attributions are listed in the accompanying credits file.
-# 
+#
+# Copyright (c) 2001-2004 Zope Corporation. All Rights Reserved.
+#
+# This software is subject to the provisions of the Zope Public License,
+# Version 2.0 (ZPL).  A copy of the ZPL should accompany this distribution.
+# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
+# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
+# FOR A PARTICULAR PURPOSE
+#
 ##############################################################################
-import os, string
+import os
 
-from Globals import DTMLFile, package_home, InitializeClass
 from AccessControl import ClassSecurityInfo
+from Globals import DTMLFile
+from Globals import package_home
+from Globals import InitializeClass
 from OFS.SimpleItem import SimpleItem
+from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 
-_dtmldir = os.path.join( package_home( globals() ), 'dtml' )
+_wwwdir = os.path.join( package_home( globals() ), 'www' )
 
-addDumperForm = DTMLFile( 'addDumper', _dtmldir )
+addDumperForm = PageTemplateFile( 'addDumper', _wwwdir )
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
-def addDumper( self, id, fspath=None, REQUEST=None ):
+def addDumper( self, id, fspath=None, use_metadata_file=0, REQUEST=None ):
     """
     """
     dumper = Dumper()
     dumper.id = id
-    dumper._setFSPath( fspath )
+    dumper.edit( fspath, use_metadata_file )
     self._setObject( id, dumper )
 
     if REQUEST is not None:
@@ -123,6 +54,7 @@ class Dumper( SimpleItem ):
     security = ClassSecurityInfo()
     
     fspath = None
+    use_metadata_file = 0
 
     #
     #   Management interface methods.
@@ -130,14 +62,15 @@ class Dumper( SimpleItem ):
     index_html = None
 
     security.declareProtected( USE_DUMPER_PERMISSION, 'editForm' )
-    editForm = DTMLFile( 'editDumper', _dtmldir )
+    editForm = PageTemplateFile( 'editDumper', _wwwdir )
 
     security.declareProtected( USE_DUMPER_PERMISSION, 'edit' )
-    def edit( self, fspath, REQUEST=None ):
+    def edit( self, fspath, use_metadata_file, REQUEST=None ):
         """
             Update the path to which we will dump our peers.
         """
         self._setFSPath( fspath )
+        self.use_metadata_file = use_metadata_file
 
         if REQUEST is not None:
             REQUEST['RESPONSE'].redirect( self.absolute_url()
@@ -201,6 +134,16 @@ class Dumper( SimpleItem ):
         #   Create/replace file;  return the file object.
         fullpath = "%s/%s" % ( self._checkFSPath( path ), filename )
         return open( fullpath, mode )
+
+    security.declarePrivate( '_createMetadataFile' )
+    def _createMetadataFile( self, path, filename, mode='w' ):
+        #   Create/replace file;  return the file object.
+        extension = self.use_metadata_file and 'metadata' or 'properties'
+        fullpath = "%s/%s.%s" % ( self._checkFSPath( path )
+                                , filename, extension )
+        file = open( fullpath, mode )
+        print >> file, "[Default]"
+        return file
     
     security.declarePrivate( '_dumpObject' )
     def _dumpObject( self, object, path=None ):
@@ -210,6 +153,8 @@ class Dumper( SimpleItem ):
             if handler is not None:
                 handler( self, object, path )
                 return 1
+        except ConflictError:
+            raise
         except:
             return -1
         return 0
@@ -246,12 +191,17 @@ class Dumper( SimpleItem ):
         if path is None:
             path = ''
         path = os.path.join( path, obj.id )
-        file = self._createFile( path, '.properties' )
+        file = self._createMetadataFile( path, '' )
         self._writeProperties( obj, file )
-        file.close()
         dumped = self._dumpObjects( obj.objectValues(), path )
         dumped.sort() # help diff out :)
-        file = self._createFile( path, '.objects' )
+
+        if self.use_metadata_file:
+            print >> file, "\n[Objects]"
+        else:
+            file.close()
+            file = self._createFile( path, '.objects' )
+
         for id, meta in dumped:
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
@@ -259,7 +209,7 @@ class Dumper( SimpleItem ):
     security.declarePrivate( '_dumpDTML' )
     def _dumpDTML( self, obj, path=None, suffix='dtml' ):
         #   Dump obj (assumed to be a DTML Method/Document) to the
-        #   filesystem as a file, appending ".dtml" to the name.
+        #   filesystem as a file, appending 'suffix' to the name.
         peer_id = obj.id()
         file = self._createFile( path, '%s.%s' % ( peer_id, suffix ) )
         text = obj.raw
@@ -270,25 +220,27 @@ class Dumper( SimpleItem ):
 
     security.declarePrivate( '_dumpDTMLMethod' )
     def _dumpDTMLMethod( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a DTML Method) to the
+        #   filesystem as a file, with the accompanyting properties file.
         self._dumpDTML( obj, path )
-        file = self._createFile( path, '%s.properties' % obj.id() )
+        file = self._createMetadataFile( path, '%s.dtml' % obj.id() )
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpDTMLDocument' )
     def _dumpDTMLDocument( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a DTML Document) to the
-        #   filesystem as a file, appending ".dtml" to the name.
+        #   filesystem as a file, with the accompanyting properties file.
         self._dumpDTML( obj, path )
-        file = self._createFile( path, '%s.properties' % obj.id() )
+        file = self._createMetadataFile( path, '%s.dtml' % obj.id() )
         self._writeProperties( obj, file )
         file.close()
 
     security.declarePrivate( '_dumpExternalMethod' )
     def _dumpExternalMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
-        #   filesystem as a file, appending ".py" to the name.
-        file = self._createFile( path, '%s.properties' % obj.id )
+        #   filesystem as a file.
+        file = self._createMetadataFile( path, '%s.em' % obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'module:string=%s\n' % obj._module )
         file.write( 'function:string=%s\n' % obj._function )
@@ -297,8 +249,8 @@ class Dumper( SimpleItem ):
     security.declarePrivate( '_dumpFileOrImage' )
     def _dumpFileOrImage( self, obj, path=None ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
-        #   filesystem as a file, appending ".py" to the name.
-        file = self._createFile( path, '%s.properties' % obj.id() )
+        #   filesystem as a file, with the accompanyting properties file.
+        file = self._createMetadataFile( path, '%s' % obj.id() )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'content_type:string=%s\n' % obj.content_type )
         file.write( 'precondition:string=%s\n' % obj.precondition )
@@ -316,52 +268,52 @@ class Dumper( SimpleItem ):
     security.declarePrivate( '_dumpPythonMethod' )
     def _dumpPythonMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Python Method) to the
-        #   filesystem as a file, appending ".py" to the name.
-        body_lines = string.split( obj._body, '\n' )
-        body = string.join( body_lines, '\n    ' )
+        #   filesystem as a file, with the accompanyting properties file.
+        body_lines = obj._body.split( '\n' )
+        body = '\n    '.join( body_lines ) 
         text = "def %s(%s)\n\n    %s" % ( obj.id, obj._params, body )
         if text[-1] != '\n':
             text = '%s\n' % text
         file = self._createFile( path, '%s.py' % obj.id )
         file.write( text )
         file.close()
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, '%s.py' % obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpPythonScript' )
     def _dumpPythonScript( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Python Script) to the
-        #   filesystem as a file, appending ".py" to the name.
+        #   filesystem as a file, with the accompanyting properties file.
         file = self._createFile( path, '%s.py' % obj.id )
         file.write( obj.read() )
         file.close()
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, '%s.py' % obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpPageTemplate' )
     def _dumpPageTemplate( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZopePageTemplate) to the
-        #   filesystem as a file, appending ".pt" to the name.
+        #   filesystem as a file, with the accompanyting properties file.
         file = self._createFile( path, '%s.pt' % obj.id )
         file.write( obj.read() )
         file.close()
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, '%s.pt' % obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpSQLMethod' )
     def _dumpSQLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a SQL Method) to the
-        #   filesystem as a file, appending ".sql" to the name.
+        #   filesystem as a file, with the accompanyting properties file.
         file = self._createFile( path, '%s.sql' % obj.id )
         text = "%s\n\n%s" % ( obj.arguments_src, obj.src )
         if text[-1] != '\n':
             text = '%s\n' % text
         file.write( text )
         file.close()
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, '%s.sql' % obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'connection_id:string=%s\n' % obj.connection_id )
         file.write( 'max_rows_:int=%s\n' % obj.max_rows_ )
@@ -374,12 +326,12 @@ class Dumper( SimpleItem ):
     security.declarePrivate( '_dumpZCatalog' )
     def _dumpZCatalog( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZCatalog) to the
-        #   filesystem as a file, appending ".catalog" to the name.
+        #   filesystem as a file, with the accompanyting properties file.
         file = self._createFile( path, '%s.catalog' % obj.id )
         for brain in obj.searchResults():
             file.write( '%s\n' % obj.getpath( brain.data_record_id_ ) )
         file.close()
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, '%s' % obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'vocab_id:string=%s\n' % obj.vocab_id )
         file.write( 'threshold:int=%s\n' % obj.threshold )
@@ -401,13 +353,11 @@ class Dumper( SimpleItem ):
         if path is None:
             path = ''
         path = os.path.join( path, obj.id )
-        file = self._createFile( path, '.properties' )
+        file = self._createMetadataFile( path, '' )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'metatype:string=%s\n' % obj._zclass_.meta_type )
         file.write( 'bases:tokens=%s\n'
-                  % string.join( map( lambda klass: str(klass), obj._zbases )
-                               , ','
-                               )
+                  % ','.join( map( lambda klass: str(klass), obj._zbases ) )
                   )
         file.write( 'class_id:int=%s\n' % obj._zclass_.__module__ )
         file.close()
@@ -455,11 +405,11 @@ class Dumper( SimpleItem ):
         #   Dump properties of obj (assumed to be a ZClass) to the
         #   filesystem as a directory, including propertysheets and
         #   methods, as well as any nested ZClasses.
-        file = self._createFile( path, '%s' % obj.id )
+        file = self._createFile( path, obj.id )
         self._writeProperties( obj, file )
         file.close()
 
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
     
@@ -467,7 +417,7 @@ class Dumper( SimpleItem ):
     def _dumpPermission( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Zope Permission) to the
         #   filesystem as a .properties file.
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'name:string=%s\n' % obj.name )
         file.close()
@@ -476,7 +426,7 @@ class Dumper( SimpleItem ):
     def _dumpFactory( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Zope Factory) to the
         #   filesystem as a .properties file.
-        file = self._createFile( path, '%s.properties' % obj.id )
+        file = self._createMetadataFile( path, obj.id )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'object_type:string=%s\n' % obj.object_type )
         file.write( 'initial:string=%s\n' % obj.initial )
@@ -491,7 +441,7 @@ class Dumper( SimpleItem ):
         if path is None:
             path = ''
         path = os.path.join( path, obj.id )
-        file = self._createFile( path, '.properties' )
+        file = self._createMetadataFile( path, '' )
         file.write( 'title:string=%s\n' % obj.title )
         file.write( 'description:text=[[%s]]\n' % obj.description )
         file.write( 'wizard_action:string=%s\n' % obj.wizard_action )
@@ -513,7 +463,7 @@ class Dumper( SimpleItem ):
         #   Dump properties of obj (assumed to be a WizardPage) to the
         #   filesystem as a file, appending ".wizardpage" to the name.
         self._dumpDTML( obj, path, 'wizardpage' )
-        file = self._createFile( path, '%s.properties' % obj.id() )
+        file = self._createMetadataFile( path, obj.id() )
         self._writeProperties( obj, file )
         file.close()
 

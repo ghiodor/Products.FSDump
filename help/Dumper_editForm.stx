@@ -21,6 +21,11 @@ Edit / Dump Dumper
         subdirectory, '/tmp/parent_folder', and build objects in it
         corresponding to the dumper's "siblings".
 
+    'Use .metadata file' --
+        If checked, write a "new-style" .metadata file, in a format
+        compatilbie with CMF 1.4 and later.  Properties go into the
+        '[Default]' section.
+
     'Change' --
         Changes the filesystem mapping.
 
