@@ -272,8 +272,12 @@ class QueueCatalog(Implicit, SimpleItem):
             self.process()
 
 
-    def process(self):
-        "Process pending events"
+    def process(self, max=None):
+        """Process pending events
+
+        Returns the number of events processed.
+        """
+        count = 0
         catalog = self.getZCatalog()
         for queue in filter(None, self._queues):
             events = queue.process()
@@ -288,6 +292,13 @@ class QueueCatalog(Implicit, SimpleItem):
                     # Note that the uid may be relative to the catalog.
                     obj = catalog.unrestrictedTraverse(uid)
                     catalog.catalog_object(obj, uid)
+                count = count + 1
+            if max and count >= max:
+                # On surpassing the maximum, return immediately
+                # so the caller can commit the transaction,
+                # sleep for a while, or do something else.
+                break
+        return count
 
     #
     # CMF catalog tool methods.
