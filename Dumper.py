@@ -329,6 +329,17 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
+    security.declarePrivate( '_dumpPythonScript' )
+    def _dumpPythonScript( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a Python Script) to the
+        #   filesystem as a file, appending ".py" to the name.
+        file = self._createFile( path, '%s.py' % obj.id )
+        file.write( obj.read() )
+        file.close()
+        file = self._createFile( path, '%s.properties' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.close()
+
     security.declarePrivate( '_dumpSQLMethod' )
     def _dumpSQLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a SQL Method) to the
@@ -502,6 +513,7 @@ class Dumper( SimpleItem ):
                 , 'File'            : _dumpFileOrImage
                 , 'Image'           : _dumpFileOrImage
                 , 'Python Method'   : _dumpPythonMethod
+                , 'Script (Python)' : _dumpPythonScript
                 , 'Z SQL Method'    : _dumpSQLMethod
                 , 'ZCatalog'        : _dumpZCatalog
                 , 'Z Class'         : _dumpZClass
