@@ -6,7 +6,7 @@ from __future__ import generators
 
 from Interface import Interface
 
-from Persistence import Persistent
+from OFS.SimpleItem import SimpleItem
 
 from Products.QueueCatalog.CatalogEventQueue import CatalogEventQueue
 from Products.QueueCatalog.CatalogEventQueue import EVENT_TYPES
@@ -46,7 +46,7 @@ class ICatalogEventQueueSetDelegate( Interface ):
         """
 
 
-class CatalogEventQueueSet( Persistent ):
+class CatalogEventQueueSet( SimpleItem ):
 
     """ Manage a set of CatalogEventQueue objects.
     """
@@ -73,6 +73,12 @@ class CatalogEventQueueSet( Persistent ):
         """ How many buckets in our hashtable?
         """
         return self._bucket_count
+
+    def getEvent( self, uid ):
+
+        """ Return the most recent event, if any, for uid.
+        """
+        return self._getQueue( uid ).getEvent( uid )
 
     def listEvents( self ):
 
@@ -134,7 +140,7 @@ class CatalogEventQueueSet( Persistent ):
         if event not in EVENT_TYPES:
             raise ValueError, 'Not a known event: %s' % event
 
-        self._queues[ hash( uid ) % self._bucket_count ].update( uid, event )
+        self._getQueue( uid ).update( uid, event )
 
     def process( self ):
 
@@ -143,7 +149,7 @@ class CatalogEventQueueSet( Persistent ):
         for queue in filter( None, self._queues ):
             for item in queue.process().items():
 
-                if not self._delegate:
+                if self._delegate is None:
                     continue
 
                 uid, ( t, event ) = item
@@ -158,6 +164,10 @@ class CatalogEventQueueSet( Persistent ):
     #
     #   Helper methods
     #
+    def _getQueue( self, uid ):
+
+        return self._queues[ hash( uid ) % self._bucket_count ]
+
     def _clear( self ):
 
         self._queues = [ CatalogEventQueue()
