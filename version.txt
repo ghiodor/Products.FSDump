@@ -1,1 +1,1 @@
-QueueCatalog-1.0-unreleased
+QueueCatalog-1.0

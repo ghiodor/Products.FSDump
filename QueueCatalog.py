@@ -24,7 +24,8 @@ from ExtensionClass import Base
 from OFS.SimpleItem import SimpleItem
 from AccessControl.SecurityManagement import getSecurityManager
 from AccessControl.SecurityInfo import ClassSecurityInformation
-from AccessControl.Permissions import manage_zcatalog_entries
+from AccessControl.Permissions \
+     import manage_zcatalog_entries, view_management_screens
 from OFS.SimpleItem import SimpleItem
 from BTrees.OOBTree import OOBTree
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
@@ -107,6 +108,7 @@ class QueueCatalog(Implicit, SimpleItem):
     def getTitle(self):
         return self.title
 
+    security.declareProtected(view_management_screens, 'setLocation')
     def setLocation(self, location):
         if self._location is not None:
             try:
@@ -115,6 +117,7 @@ class QueueCatalog(Implicit, SimpleItem):
                 self._clearQueues()
         self._location = location
 
+    security.declareProtected(view_management_screens, 'getIndexInfo')
     def getIndexInfo(self):
         try:
             c = self.getZCatalog()
@@ -129,23 +132,29 @@ class QueueCatalog(Implicit, SimpleItem):
             return res
 
 
+    security.declareProtected(view_management_screens, 'getImmediateIndexes')
     def getImmediateIndexes(self):
         return self._immediate_indexes
 
+    security.declareProtected(view_management_screens, 'setImmediateIndexes')
     def setImmediateIndexes(self, indexes):
         self._immediate_indexes = tuple(map(str, indexes))
 
 
+    security.declareProtected(view_management_screens, 'getImmediateRemoval')
     def getImmediateRemoval(self):
         return self._immediate_removal
 
+    security.declareProtected(view_management_screens, 'setImmediateRemoval')
     def setImmediateRemoval(self, flag):
         self._immediate_removal = not not flag
 
 
+    security.declareProtected(view_management_screens, 'getBucketCount')
     def getBucketCount(self):
         return self._buckets
 
+    security.declareProtected(view_management_screens, 'setBucketCount')
     def setBucketCount(self, count):
         if self._location:
             self.process()
@@ -153,6 +162,7 @@ class QueueCatalog(Implicit, SimpleItem):
         self._clearQueues()
 
 
+    security.declareProtected(manage_zcatalog_entries, 'getZCatalog')
     def getZCatalog(self, method=''):
         ZC = None
         REQUEST = getattr(self, 'REQUEST', None)
@@ -214,6 +224,7 @@ class QueueCatalog(Implicit, SimpleItem):
         t = time()
         self._queues[hash(uid) % self._buckets].update(uid, etype)
 
+    security.declareProtected(manage_zcatalog_entries, 'catalog_object')
     def catalog_object(self, obj, uid=None):
 
         # Make sure the current context is allowed to to this:
@@ -264,11 +275,8 @@ class QueueCatalog(Implicit, SimpleItem):
             catalog.catalog_object(obj, uid, immediate_indexes)
 
 
+    security.declareProtected(manage_zcatalog_entries, 'uncatalog_object')
     def uncatalog_object(self, uid):
-
-        # Make sure the current context is allowed to to this:
-        self.getZCatalog('uncatalog_object')
-
         if not isinstance(uid, StringType):
             uid = '/'.join(uid)
 
@@ -278,6 +286,7 @@ class QueueCatalog(Implicit, SimpleItem):
             self.process()
 
 
+    security.declareProtected(manage_zcatalog_entries, 'process')
     def process(self, max=None):
         """ Process pending events and return number of events processed. """
         if not self.manage_size():
@@ -347,11 +356,14 @@ class QueueCatalog(Implicit, SimpleItem):
     # out the PageTemplateFiles in some brittle way to make them do
     # the right thing. :(
 
+    security.declareProtected(view_management_screens, 'manage_editForm')
     manage_editForm = PageTemplateFile('www/edit', globals())
 
+    security.declareProtected(view_management_screens, 'manage_getLocation')
     def manage_getLocation(self):
         return self._location or ''
 
+    security.declareProtected(view_management_screens, 'manage_edit')
     def manage_edit(self, title='', location='', immediate_indexes=(),
                     immediate_removal=0, bucket_count=0, RESPONSE=None):
         """ Edit the instance """
@@ -369,8 +381,10 @@ class QueueCatalog(Implicit, SimpleItem):
                               'Properties+changed' % self.absolute_url())
 
 
+    security.declareProtected(manage_zcatalog_entries, 'manage_queue')
     manage_queue = DTMLFile('dtml/queue', globals())
 
+    security.declareProtected(manage_zcatalog_entries, 'manage_process')
     def manage_size(self):
         size = 0
         for q in self._queues:
@@ -378,12 +392,16 @@ class QueueCatalog(Implicit, SimpleItem):
 
         return size
 
-    def manage_process(self, REQUEST, count=100):
+    security.declareProtected(manage_zcatalog_entries, 'manage_process')
+    def manage_process(self, count=100, REQUEST=None):
         "Web UI to manually process queues"
         count = int(count)
         processed = self.process(max=count)
-        msg = '%i Queue item(s) processed' % processed
-        return self.manage_queue(manage_tabs_message=msg)
+        if REQUEST is not None:
+            msg = '%i Queue item(s) processed' % processed
+            return self.manage_queue(manage_tabs_message=msg)
+        else:
+            return processed
 
     # Provide Zope 2 offerings
 
@@ -410,16 +428,8 @@ class QueueCatalog(Implicit, SimpleItem):
 
     security.declareProtected(manage_zcatalog_entries,
                               'catalog_object', 'uncatalog_object',
-                              'refreshCatalog',
-                              'manage_process', 'process')
+                              'refreshCatalog')
 
-    security.declareProtected(
-        'View management screens',
-        'manage_editForm', 'manage_edit',
-        'manage_queue', 'manage_getLocation',
-        'manage_size', 'getIndexInfo', 'getImmediateIndexes',
-        'getImmediateRemoval', 'getBucketCount', 'setBucketCount',
-        )
 
 def cataloged(catalog, path):
     getrid = getattr(catalog, 'getrid', None)
