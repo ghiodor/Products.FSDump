@@ -58,6 +58,27 @@
 
     <tr>
       <td align="left" valign="top" class="form-label">
+        Update metadata immediately
+      </td>
+      <td align="left" valign="top" colspan="3">
+        <input type="checkbox" name="immediate_metadata"
+               tal:attributes="checked here/getImmediateMetadataUpdate" />
+      </td>
+    </tr>
+
+    <tr>
+      <td align="left" valign="top" class="form-label">
+        Process all indexes during queue (as opposed to only the
+        non-immediate ones)
+      </td>
+      <td align="left" valign="top" colspan="3">
+        <input type="checkbox" name="all_indexes"
+               tal:attributes="checked here/getProcessAllIndexes" />
+      </td>
+    </tr>
+
+    <tr>
+      <td align="left" valign="top" class="form-label">
         Bucket count
       </td>
       <td align="left" valign="top" colspan="3">

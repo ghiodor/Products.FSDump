@@ -15,10 +15,14 @@
 $Id$
 """
 # Python std. lib
+import sets, sys
 from time import time
 from types import StringType
 
 # Other packages
+from ZODB.POSException import ConflictError
+from ZEO.Exceptions import ClientDisconnected
+from zLOG import LOG, INFO, BLATHER, ERROR
 from zExceptions import Unauthorized
 from ExtensionClass import Base
 from OFS.SimpleItem import SimpleItem
@@ -93,6 +97,9 @@ class QueueCatalog(Implicit, SimpleItem):
     _immediate_indexes = ()  # The names of indexes to update immediately
     _location = None
     _immediate_removal = 1   # Flag: don't queue removal
+    _immediate_metadata_update = 1 # Flag: don't queue metadata creation
+    _process_all_indexes = 0 # Flag: queue-process all, not just non-immediate,
+                             #       indexes
     title = ''
 
     # When set, _v_catalog_cache is a tuple containing the wrapped ZCatalog
@@ -141,15 +148,31 @@ class QueueCatalog(Implicit, SimpleItem):
     def setImmediateIndexes(self, indexes):
         self._immediate_indexes = tuple(map(str, indexes))
 
-
     security.declareProtected(view_management_screens, 'getImmediateRemoval')
     def getImmediateRemoval(self):
         return self._immediate_removal
 
     security.declareProtected(view_management_screens, 'setImmediateRemoval')
     def setImmediateRemoval(self, flag):
-        self._immediate_removal = not not flag
+        self._immediate_removal = bool(flag)
 
+    security.declareProtected(view_management_screens,
+                              'getImmediateMetadataUpdate')
+    def getImmediateMetadataUpdate(self):
+        return self._immediate_metadata_update
+
+    security.declareProtected(view_management_screens,
+                              'setImmediateMetadataUpdate')
+    def setImmediateMetadataUpdate(self, flag):
+        self._immediate_metadata_update = bool(flag)
+
+    security.declareProtected(view_management_screens, 'getProcessAllIndexes')
+    def getProcessAllIndexes(self):
+        return self._process_all_indexes
+
+    security.declareProtected(view_management_screens, 'setProcessAllIndexes')
+    def setProcessAllIndexes(self, flag):
+        self._process_all_indexes = bool(flag)
 
     security.declareProtected(view_management_screens, 'getBucketCount')
     def getBucketCount(self):
@@ -189,7 +212,7 @@ class QueueCatalog(Implicit, SimpleItem):
                 raise QueueConfigurationError(
                     "ZCatalog not found at %s." % self._location
                     )
-            if not hasattr(ZC, 'getIndexObjects'):  # XXX need a better check
+            if not hasattr(ZC, 'getIndexObjects'): # XXX need a better check
                 raise QueueConfigurationError(
                     "The object at %s does not implement the "
                     "IZCatalog interface." % self._location
@@ -226,9 +249,18 @@ class QueueCatalog(Implicit, SimpleItem):
         self._queues[hash(uid) % self._buckets].update(uid, etype)
 
     security.declareProtected(manage_zcatalog_entries, 'catalog_object')
-    def catalog_object(self, obj, uid=None):
+    def catalog_object(self, obj, uid=None, idxs=None, update_metadata=1):
+        # update_metadata=0 is ignored if the queued catalog is set to
+        # update metadata during queue processing, rather than immediately
 
-        # Make sure the current context is allowed to to this:
+        # similarly, limiting the idxs only limits the immediate indexes.  If
+        # any work needs to be done in the queue processing, it will all be 
+        # done: we have not implemented partial indexing during queue
+        # processing.  The only way to avoid any of it is to avoid all of it
+        # (i.e., update metadata immediately and don't have any indexes to
+        # update on the queued side).
+
+        # Make sure the current context is allowed to do this:
         catalog_object = self.getZCatalog('catalog_object')
 
         if uid is None:
@@ -237,10 +269,9 @@ class QueueCatalog(Implicit, SimpleItem):
             uid = '/'.join(uid)
 
         catalog = self.getZCatalog()
-        cat_indexes = list(catalog.indexes())
-        cat_indexes.sort()
-        immediate_indexes = list(self._immediate_indexes)
-        immediate_indexes.sort()
+        cat_indexes = sets.Set(catalog.indexes())
+        immediate_indexes = sets.Set(self._immediate_indexes)
+        cat_indexes -= immediate_indexes
 
         # The ZCatalog API doesn't allow us to distinguish between
         # adds and updates, so we have to try to figure this out
@@ -256,25 +287,33 @@ class QueueCatalog(Implicit, SimpleItem):
         # down a bit, but adds should be relatively infrequent.
 
         # Now, try to decide if the catalog has the uid (path).
+        already_cataloged = cataloged(catalog, uid)
+        if not already_cataloged:
+            # Looks like we should add, but maybe there's already a
+            # pending add event. We'd better check the event queue:
+            already_cataloged = (
+                self._queues[hash(uid) % self._buckets].getEvent(uid) in
+                ADDED_EVENTS)
 
-        if immediate_indexes != cat_indexes:
-            if cataloged(catalog, uid):
-                event = CHANGED
-            else:
-                # Looks like we should add, but maybe there's already a
-                # pending add event. We'd better check the event queue:
-                if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
-                    ADDED_EVENTS):
-                    event = CHANGED
-                else:
-                    event = ADDED
+        if idxs and already_cataloged:
+            # if not already_cataloged, we index the whole thing
+            idxs = sets.Set(idxs)
+            immediate_indexes.intersection_update(idxs)
+            cat_indexes.intersection_update(idxs)
 
-            self._update(uid, event)
+        immediate_metadata = self.getImmediateMetadataUpdate()
+        if cat_indexes or update_metadata and not immediate_metadata:
+            self._update(uid, already_cataloged and CHANGED or ADDED)
 
         if immediate_indexes:
             # Update some of the indexes immediately.
-            catalog.catalog_object(obj, uid, immediate_indexes)
-
+            catalog.catalog_object(
+                obj, uid, immediate_indexes,
+                update_metadata=update_metadata and immediate_metadata)
+        elif update_metadata and immediate_metadata:
+            # if it is added, no point in doing the metadata, and it will be
+            # done in the queue process anyway
+            catalog._catalog.updateMetadata(obj, uid)
 
     security.declareProtected(manage_zcatalog_entries, 'uncatalog_object')
     def uncatalog_object(self, uid):
@@ -312,13 +351,29 @@ class QueueCatalog(Implicit, SimpleItem):
     def _process_queue(self, queue, limit):
         """Process a single queue"""
         catalog = self.getZCatalog()
+
+        if self.getProcessAllIndexes():
+            idxs = None
+        else:
+            cat_indexes = sets.Set(catalog.indexes())
+            immediate_indexes = sets.Set(self._immediate_indexes)
+            if not immediate_indexes or immediate_indexes==cat_indexes:
+                idxs = None # do all of 'em
+            else:
+                idxs = list(cat_indexes - immediate_indexes)
         events = queue.process(limit)
         count = 0
 
         for uid, (t, event) in events.items():
             if event is REMOVED:
-                if cataloged(catalog, uid):
-                    catalog.uncatalog_object(uid)
+                try:
+                    if cataloged(catalog, uid):
+                        catalog.uncatalog_object(uid)
+                except (ConflictError, ClientDisconnected):
+                    raise
+                except:
+                    LOG('QueueCatalog', ERROR, 'error uncataloging object', 
+                        error=sys.exc_info())
             else:
                 # add or change
                 if event is CHANGED and not cataloged(catalog, uid):
@@ -326,7 +381,16 @@ class QueueCatalog(Implicit, SimpleItem):
                 # Note that the uid may be relative to the catalog.
                 obj = catalog.unrestrictedTraverse(uid, None)
                 if obj is not None:
-                    catalog.catalog_object(obj, uid)
+                    immediate_metadata = self.getImmediateMetadataUpdate()
+                    try:
+                        catalog.catalog_object(
+                            obj, uid, idxs=idxs,
+                            update_metadata=not immediate_metadata)
+                    except (ConflictError, ClientDisconnected):
+                        raise
+                    except:
+                        LOG('QueueCatalog', ERROR, 'error cataloging object',
+                            error=sys.exc_info())
 
             count = count + 1
 
@@ -349,14 +413,13 @@ class QueueCatalog(Implicit, SimpleItem):
         self.uncatalog_object(self.uidForObject(object))
 
     security.declarePrivate('reindexObject')
-    def reindexObject(self, object, idxs=[]):
+    def reindexObject(self, object, idxs=None):
         """Update catalog after object data has changed.
 
         The optional idxs argument is a list of specific indexes
         to update (all of them by default).
         """
-        # Punt for now and ignore idxs.
-        self.catalog_object(object, self.uidForObject(object))
+        self.catalog_object(object, self.uidForObject(object), idxs=idxs)
 
     security.declarePrivate('uidForObject')
     def uidForObject(self, obj):
@@ -381,12 +444,15 @@ class QueueCatalog(Implicit, SimpleItem):
 
     security.declareProtected(view_management_screens, 'manage_edit')
     def manage_edit(self, title='', location='', immediate_indexes=(),
-                    immediate_removal=0, bucket_count=0, RESPONSE=None):
+                    immediate_removal=0, bucket_count=0, immediate_metadata=0,
+                    all_indexes=0, RESPONSE=None):
         """ Edit the instance """
         self.title = title
         self.setLocation(location or None)
         self.setImmediateIndexes(immediate_indexes)
         self.setImmediateRemoval(immediate_removal)
+        self.setImmediateMetadataUpdate(immediate_metadata)
+        self.setProcessAllIndexes(all_indexes)
         if bucket_count:
             bucket_count = int(bucket_count)
             if bucket_count != self.getBucketCount():

@@ -94,8 +94,8 @@ class CatalogEventQueue(Persistent):
     It's not clear what should be done in this case? We decide to
     generate a remove event, even though a later transaction added the
     object again. Is this correct? It's hard to say. The decision we
-    make is not horrible and it allows us to provide a very effeicient
-    implementation.  See the unit tests for other scenarious. Feel
+    make is not horrible and it allows us to provide a very efficient
+    implementation.  See the unit tests for other scenarios. Feel
     free to think of cases for which our decisions are unacceptably
     wrong and write unit tests for these cases.
 
@@ -219,7 +219,7 @@ class CatalogEventQueue(Persistent):
 
                 committed_data[uid] = new
 
-        # Now handler remaining events in old that weren't in new.
+        # Now handle remaining events in old that weren't in new.
         # These *must* be undone events!
         for uid, old in oldstate_data.items():
             new = (0, antiEvent(old[1]))
