@@ -2,7 +2,7 @@ FSDump Product
 
   Author
 
-    "Tres Seaver", mailto:tseaver@digicool.com, Digital Creations
+    "Tres Seaver", mailto:tseaver@zope.com, Zope Corporation
 
   Overview
 

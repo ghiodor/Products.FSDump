@@ -10,6 +10,22 @@ Mapping TTW Code to the Filesystem
       '.properties' suffix.  Store one property per line, using
       'name:type=value' syntax.
 
+      o XXX: in companion ".metadata" file, store the properties
+        in the '[Default]' section.
+
+    * Map the permission-role map in the '[Permissions]' section of the
+      companion ".metadata" file (XXX this feature not present before
+      the switch to '.metadata', although it might have mapped to the
+      ".security" file supported by CMF 1.3)
+
+    * Map local roles in the '[LocalRoles]' section of the
+      companion ".metadata" file (XXX this feature not present before
+      the switch to '.metadata')
+
+    * Write proxy roles to a 'proxy' property (XXX CMF 1.4 compatibility;
+      this is an *ugly* spelling).  Should probably put it into a "prettier"
+      spelling, as well, and lobby to change the spelling used in CMF.
+
     * Preserve enough metadata to be able to recreate the TTW
       object, preferably by *using its web interface.*  This rule
       is the chief differentiator (in concept) from pickling; we
@@ -24,6 +40,9 @@ Mapping TTW Code to the Filesystem
 
         - Store a list of the dumped items in an ".objects" file,
           one line per item, using the format, 'name:meta_type'.
+
+          o XXX: in ".metadata" file, store the same lines in an
+            '[Objects]' directory.
 
     'Python Method'
 
