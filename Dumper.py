@@ -18,6 +18,7 @@ from Globals import package_home
 from Globals import InitializeClass
 from OFS.SimpleItem import SimpleItem
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
+from ZODB.POSException import ConflictError
 
 _wwwdir = os.path.join( package_home( globals() ), 'www' )
 

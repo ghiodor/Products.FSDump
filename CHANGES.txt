@@ -1,5 +1,10 @@
 FSDump Change Log
 
+  After FSDump 0.8.1
+
+    * Fix missing import of ConflictError (thanks to Willi Langenburger
+      for the patch).
+
   FSDump 0.8.1 (2004/12/09)
 
     * Repackaged to nest the actual products directory inside a version-
