@@ -340,6 +340,17 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
+    security.declarePrivate( '_dumpPageTemplate' )
+    def _dumpPageTemplate( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a ZopePageTemplate) to the
+        #   filesystem as a file, appending ".pt" to the name.
+        file = self._createFile( path, '%s.pt' % obj.id )
+        file.write( obj.read() )
+        file.close()
+        file = self._createFile( path, '%s.properties' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.close()
+
     security.declarePrivate( '_dumpSQLMethod' )
     def _dumpSQLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a SQL Method) to the
@@ -514,6 +525,7 @@ class Dumper( SimpleItem ):
                 , 'Image'           : _dumpFileOrImage
                 , 'Python Method'   : _dumpPythonMethod
                 , 'Script (Python)' : _dumpPythonScript
+                , 'Page Template'   : _dumpPageTemplate
                 , 'Z SQL Method'    : _dumpSQLMethod
                 , 'ZCatalog'        : _dumpZCatalog
                 , 'Z Class'         : _dumpZClass
