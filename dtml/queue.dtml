@@ -2,7 +2,7 @@
 <dtml-var manage_tabs>
 
 <p class="form-help">
-  This form shows the number ot items in the queue and allows
+  This form shows the number of items in the queue and allows
   the user to process all queued items immediately.
 </p>
 
