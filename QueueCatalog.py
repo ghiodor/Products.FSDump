@@ -45,9 +45,14 @@ _zcatalog_methods = {
     '__call__': 1,
     }
 
-_zcatalog_method = _zcatalog_methods.has_key
+_is_zcatalog_method = _zcatalog_methods.has_key
 
 _views = {}
+
+
+class QueueConfigurationError(Exception):
+    pass
+
 
 class QueueCatalog(Implicit, SimpleItem):
     """Queued ZCatalog (Proxy)
@@ -75,33 +80,72 @@ class QueueCatalog(Implicit, SimpleItem):
       
     """
 
+    _deferred_indexes = ()  # The names of indexes to defer
+    _location = None
+    title = ''
+
+    # When set, _v_catalog_cache is a tuple containing the wrapped ZCatalog
+    # and the REQUEST it is bound to.
+    _v_catalog_cache = None
+
     def __init__(self, buckets=1009):
         self._buckets = buckets
-        self._location = None
-        self._queues = [CatalogEventQueue() for i in range(buckets)]
+        self._clearQueues()
+
+    def _clearQueues(self):
+        self._queues = [CatalogEventQueue() for i in range(self._buckets)]
+
+    def getTitle(self):
+        return self.title
 
     def setLocation(self, location):
         if self._location is not None:
             try:
                 self.process()
-            except TypeError:
-                # clear the queues
-                self.__init__()
-
+            except QueueConfigurationError:
+                self._clearQueues()
         self._location = location
-        
+
+    def getIndexInfo(self):
+        try:
+            c = self.getZCatalog()
+        except QueueConfigurationError:
+            return None
+        else:
+            items = [(ob.id, ob.meta_type) for ob in c.getIndexObjects()]
+            items.sort()
+            res = []
+            for id, meta_type in items:
+                res.append({'id': id, 'meta_type': meta_type})
+            return res
+
+    def getDeferredIndexes(self):
+        return self._deferred_indexes
+
+    def setDeferredIndexes(self, indexes):
+        self._deferred_indexes = tuple(map(str, indexes))
+
 
     def getZCatalog(self, method=''):
-        
-        ZC = getattr(self, '_v_ZCatalog', None)
+        ZC = None
+        REQUEST = self.REQUEST
+        cache = self._v_catalog_cache
+        if cache is not None:
+            # The cached catalog may be wrapped with an earlier
+            # request.  Before using it, check the request.
+            (ZC, req) = cache
+            if req is not REQUEST:
+                # It's an old wrapper.  Discard.
+                ZC = None
+
         if ZC is None:
             if self._location is None:
-                raise TypeError(
+                raise QueueConfigurationError(
                     "This QueueCatalog hasn't been "
                     "configured with a ZCatalog location."
                     )
             ZC = self.unrestrictedTraverse(self._location)
-            self._v_ZCatalog = ZC
+            self._v_catalog_cache = (ZC, REQUEST)
 
         security_manager = getSecurityManager()
 
@@ -109,28 +153,25 @@ class QueueCatalog(Implicit, SimpleItem):
             raise Unauthorized(self._location, ZC)
 
         if method:
-            if not _zcatalog_method(method):
+            if not _is_zcatalog_method(method):
                 raise AttributeError(method)
-            ZC = getattr(ZC, method)
-            if not security_manager.validateValue(ZC):
+            m = getattr(ZC, method)
+            if not security_manager.validateValue(m):
                 raise Unauthorized(name=method)
-                
-
-        return ZC
+            return m
+        else:
+            return ZC
 
     def __getattr__(self, name):
         # The original object must be wrapped, but self isn't, so
         # we return a special object that will do the attribute access
         # on a wrapped object. 
-        if _zcatalog_method(name):
+        if _is_zcatalog_method(name):
             return AttrWrapper(name)
 
         raise AttributeError(name)
 
     def _update(self, uid, etype):
-        if uid[:1] != '/':
-            raise TypeError("uid must start with '/'")
-
         t = time()
         self._queues[hash(uid) % self._buckets].update(uid, etype)
         
@@ -143,6 +184,16 @@ class QueueCatalog(Implicit, SimpleItem):
             uid = '/'.join(obj.getPhysicalPath())
         elif type(uid) is not StringType:
             uid = '/'.join(uid)
+
+        catalog = self.getZCatalog()
+
+        immediate_indexes = catalog.indexes()
+        # Choose which indexes to update.
+        for index in self._deferred_indexes:
+            try:
+                immediate_indexes.remove(index)
+            except ValueError:
+                pass
 
         # The ZCatalog API doesn't allow us to distinguish between
         # adds and updates, so we have to try to figure this out
@@ -159,21 +210,23 @@ class QueueCatalog(Implicit, SimpleItem):
 
         # Now, try to decide if the catalog has the uid (path).
 
-        catalog = self.getZCatalog()
-
-        if cataloged(catalog, uid):
-            event = CHANGED
-        else:
-            # Looks like we should add, but maybe there's already a
-            # pending add event. We'd better check the event queue:
-            
-            if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
-                ADDED_EVENTS):
+        if self._deferred_indexes:
+            if cataloged(catalog, uid):
                 event = CHANGED
             else:
-                event = ADDED
-        
-        self._update(uid, event)
+                # Looks like we should add, but maybe there's already a
+                # pending add event. We'd better check the event queue:
+                if (self._queues[hash(uid) % self._buckets].getEvent(uid) in
+                    ADDED_EVENTS):
+                    event = CHANGED
+                else:
+                    event = ADDED
+
+            self._update(uid, event)
+
+        if immediate_indexes:
+            catalog.catalog_object(obj, uid, immediate_indexes)
+
 
     def uncatalog_object(self, uid):
 
@@ -196,11 +249,10 @@ class QueueCatalog(Implicit, SimpleItem):
                         catalog.uncatalog_object(uid)
                 else:
                     # add or change
-
                     if event is CHANGED and not cataloged(catalog, uid):
                         continue
-                    
-                    obj = self.unrestrictedTraverse(uid)
+                    # Note that the uid may be relative to the catalog.
+                    obj = catalog.unrestrictedTraverse(uid)
                     catalog.catalog_object(obj, uid)
 
     # Provide web pages. It would be nice to use views, but Zope 2.6
@@ -208,23 +260,21 @@ class QueueCatalog(Implicit, SimpleItem):
     # out the PageTemplateFiles in some brittle way to make them do
     # the right thing. :(
 
-    manage_editForm = DTMLFile('dtml/edit', globals())
+    manage_editForm = PageTemplateFile('www/edit', globals())
 
     def manage_getLocation(self):
         return self._location or ''
 
-
-    def manage_edit(self, title='', location='', REQUEST=None):
+    def manage_edit(self, title='', location='', deferred_indexes=(),
+                    RESPONSE=None):
         """ Edit the instance """
         self.title = title
         self.setLocation(location or None)
+        self.setDeferredIndexes(deferred_indexes)
 
-        if REQUEST is not None:
-            msg = 'Properties changed'
-            return self.manage_editForm( self
-                                       , REQUEST
-                                       , manage_tabs_message=msg
-                                       )
+        if RESPONSE is not None:
+            RESPONSE.redirect('%s/manage_editForm?manage_tabs_message='
+                              'Properties+changed' % self.absolute_url())
         
     
     manage_queue = DTMLFile('dtml/queue', globals())
@@ -255,7 +305,6 @@ class QueueCatalog(Implicit, SimpleItem):
 
     meta_type = 'ZCatalog Queue'
 
-    __allow_access_to_unprotected_subobjects__ = 0
     manage_options=(
         (
         {'label': 'Configure', 'action': 'manage_editForm',
@@ -270,15 +319,17 @@ class QueueCatalog(Implicit, SimpleItem):
     security = ClassSecurityInformation()
 
     security.declareObjectPublic()
+    # Disallow access to subobjects with no security assertions.
+    security.setDefaultAccess('deny')
 
     security.declarePublic('catalog_object', 'uncatalog_object',
-                           'manage_process')
+                           'manage_process', 'getTitle')
 
     security.declareProtected(
         'View management screens',
         'manage_editForm', 'manage_edit',
         'manage_queue', 'manage_getLocation',
-        'manage_size'
+        'manage_size', 'getIndexInfo', 'getDeferredIndexes'
         )
     
 def cataloged(catalog, path):
@@ -309,10 +360,4 @@ class AttrWrapper(Base):
         return wrappedQueueCatalog.getZCatalog(self.__name__)
 
 __doc__ = QueueCatalog.__doc__ + __doc__
-
-
-
-
-
-
 

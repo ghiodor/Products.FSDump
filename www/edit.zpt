@@ -1,0 +1,61 @@
+<h1 tal:replace="structure here/manage_page_header">Header</h1>
+<h1 tal:replace="structure here/manage_tabs">Tabs</h1>
+
+<p class="form-help">
+  Edit the properties of this ZCatalog Queue on this form
+</p>
+
+<form action="manage_edit">
+
+  <table cellspacing="0" cellpadding="3">
+
+    <tr>
+      <td align="left" valign="top"><div class="form-optional">
+        Title
+      </div></td>
+      <td align="left" valign="top" colspan="3">
+        <input type="text" name="title" size="40"
+               tal:attributes="value here/getTitle" />
+      </td>
+    </tr>
+
+    <tr>
+      <td align="left" valign="top" class="form-label">
+        Catalog location
+      </td>
+      <td align="left" valign="top" colspan="3">
+        <input name="location"
+               tal:attributes="value here/manage_getLocation" />
+      </td>
+    </tr>
+
+    <tr tal:define="indexes here/getIndexInfo" tal:condition="indexes">
+      <td align="left" valign="top"><div class="form-optional">
+         Indexes to defer
+      </td>
+      <td align="left" valign="top" colspan="3">
+
+<select name="deferred_indexes:list" multiple="multiple"
+  tal:define="deferred_indexes here/getDeferredIndexes">
+<option tal:repeat="index_info indexes"
+  tal:attributes="value index_info/id; selected python:
+  index_info['id'] in deferred_indexes"
+  tal:content="string: ${index_info/id} (${index_info/meta_type})"></option>
+</select>
+
+      </td>
+    </tr>
+
+    <tr>
+      <td>&nbsp;</td>
+      <td colspan="3">
+        <br>
+        <input type="submit" name="submit" value="Save Changes">
+      </td>
+    </tr>
+
+  </table>
+
+</form>
+
+<h1 tal:replace="structure here/manage_page_footer">Footer</h1>

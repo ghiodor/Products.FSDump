@@ -34,18 +34,10 @@
 
     <tr>
       <td align="left" valign="top"><div class="form-label">
-        Catalog Instance
+        Catalog Location
       </div></td>
       <td align="left" valign="top"><div class="form-element">
-        <select name="location">
-          <dtml-in expr="superValues(['ZCatalog'])">
-            <dtml-let cat_path="'/%s' % absolute_url(1)">
-              <option value="&dtml-cat_path;">
-                &dtml-title; (&dtml-cat_path;)
-              </option>
-            </dtml-let>
-          </dtml-in>
-        </select>
+        <input type="text" name="location" size="40" />
       </div></td>
     </tr>
 
