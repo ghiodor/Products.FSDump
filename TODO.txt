@@ -1,0 +1,20 @@
+FSDump ToDo's
+
+  * Finish out the typelist for "standard" metatypes:
+
+    - Database connectors
+
+  * Integrate with the HelpSystem.
+
+  * Add an ability to export permission mappings (for any
+    permission which isn't acquired).
+
+  * Add an ability to export local roles (??)
+
+  * Introspect ZClass instances to export them using their
+    propertysheets?
+
+  * Make the dumper easier to extend (e.g., by adding
+    *more* TTW code to emit FS code ;), or by registering
+    handlers for new metatypes.)
+

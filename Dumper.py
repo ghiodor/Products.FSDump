@@ -1,10 +1,98 @@
-from OFS.SimpleItem import SimpleItem
-from Globals import HTMLFile, package_home
+##############################################################################
+# 
+# Zope Public License (ZPL) Version 1.0
+# -------------------------------------
+# 
+# Copyright (c) Digital Creations.  All rights reserved.
+# 
+# This license has been certified as Open Source(tm).
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+# 
+# 1. Redistributions in source code must retain the above copyright
+#    notice, this list of conditions, and the following disclaimer.
+# 
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions, and the following disclaimer in
+#    the documentation and/or other materials provided with the
+#    distribution.
+# 
+# 3. Digital Creations requests that attribution be given to Zope
+#    in any manner possible. Zope includes a "Powered by Zope"
+#    button that is installed by default. While it is not a license
+#    violation to remove this button, it is requested that the
+#    attribution remain. A significant investment has been put
+#    into Zope, and this effort will continue if the Zope community
+#    continues to grow. This is one way to assure that growth.
+# 
+# 4. All advertising materials and documentation mentioning
+#    features derived from or use of this software must display
+#    the following acknowledgement:
+# 
+#      "This product includes software developed by Digital Creations
+#      for use in the Z Object Publishing Environment
+#      (http://www.zope.org/)."
+# 
+#    In the event that the product being advertised includes an
+#    intact Zope distribution (with copyright and license included)
+#    then this clause is waived.
+# 
+# 5. Names associated with Zope or Digital Creations must not be used to
+#    endorse or promote products derived from this software without
+#    prior written permission from Digital Creations.
+# 
+# 6. Modified redistributions of any form whatsoever must retain
+#    the following acknowledgment:
+# 
+#      "This product includes software developed by Digital Creations
+#      for use in the Z Object Publishing Environment
+#      (http://www.zope.org/)."
+# 
+#    Intact (re-)distributions of any official Zope release do not
+#    require an external acknowledgement.
+# 
+# 7. Modifications are encouraged but must be packaged separately as
+#    patches to official Zope releases.  Distributions that do not
+#    clearly separate the patches from the original work must be clearly
+#    labeled as unofficial distributions.  Modifications which do not
+#    carry the name Zope may be packaged in any form, as long as they
+#    conform to all of the clauses above.
+# 
+# 
+# Disclaimer
+# 
+#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+#   SUCH DAMAGE.
+# 
+# 
+# This software consists of contributions made by Digital Creations and
+# many individuals on behalf of Digital Creations.  Specific
+# attributions are listed in the accompanying credits file.
+# 
+##############################################################################
 import os, string
+
+from Globals import DTMLFile, package_home, InitializeClass
+from AccessControl import ClassSecurityInfo
+from OFS.SimpleItem import SimpleItem
 
 _dtmldir = os.path.join( package_home( globals() ), 'dtml' )
 
-addDumperForm = HTMLFile( 'addDumper', _dtmldir )
+addDumperForm = DTMLFile( 'addDumper', _dtmldir )
+
+USE_DUMPER_PERMISSION = 'Use Dumper'
 
 def addDumper( self, id, fspath=None, REQUEST=None ):
     """
@@ -24,21 +112,16 @@ class Dumper( SimpleItem ):
 
     manage_options = ( { 'label'    : 'Edit'
                        , 'action'   : 'editForm'
+                       , 'help'     : ('FSDump' ,'Dumper_editForm.stx')
                        }
                      , { 'label'    : 'Security'
                        , 'action'   : 'manage_access'
+                       , 'help'     : ('OFSP','Security_Define-Permissions.stx')
                        }
                      )
-    
-    __ac__permissions = ( ( 'Use Dumper'
-                          , ( 'editForm'
-                            , 'edit'
-                            , 'dumpToFS'
-                            )
-                          , ( 'Manager', )
-                          )
-                        )
 
+    security = ClassSecurityInfo()
+    
     fspath = None
 
     #
@@ -46,8 +129,10 @@ class Dumper( SimpleItem ):
     #
     index_html = None
 
-    editForm = HTMLFile( 'editDumper', _dtmldir )
+    security.declareProtected( USE_DUMPER_PERMISSION, 'editForm' )
+    editForm = DTMLFile( 'editDumper', _dtmldir )
 
+    security.declareProtected( USE_DUMPER_PERMISSION, 'edit' )
     def edit( self, fspath, REQUEST=None ):
         """
             Update the path to which we will dump our peers.
@@ -60,6 +145,7 @@ class Dumper( SimpleItem ):
                                         + '?manage_tabs_message=Dumper+updated.'
                                         )
 
+    security.declareProtected( USE_DUMPER_PERMISSION, 'dumpToFS' )
     def dumpToFS( self, REQUEST=None ):
         """
             Iterate recursively over our peers, creating simulacra
@@ -79,6 +165,7 @@ class Dumper( SimpleItem ):
     #
     #   Utility methods
     #
+    security.declarePrivate( '_setFSPath' )
     def _setFSPath( self, fspath ):
         #   Canonicalize fspath.
         fspath = os.path.normpath( fspath )
@@ -86,6 +173,7 @@ class Dumper( SimpleItem ):
             raise "Dumper Error", "Path must be absolute."
         self.fspath = fspath
 
+    security.declarePrivate( '_buildPathString' )
     def _buildPathString( self, path=None ):
         #   Construct a path string, relative to self.fspath.
         if self.fspath is None:
@@ -98,6 +186,7 @@ class Dumper( SimpleItem ):
         
         return path
 
+    security.declarePrivate( '_checkFSPath' )
     def _checkFSPath( self, path=None ):
         #   Ensure that fspath/path exists.
         path = self._buildPathString( path )
@@ -107,11 +196,13 @@ class Dumper( SimpleItem ):
         
         return path
 
+    security.declarePrivate( '_createFile' )
     def _createFile( self, path, filename, mode='w' ):
         #   Create/replace file;  return the file object.
         fullpath = "%s/%s" % ( self._checkFSPath( path ), filename )
         return open( fullpath, mode )
     
+    security.declarePrivate( '_dumpObject' )
     def _dumpObject( self, object, path=None ):
         #   Dump one item, using path as prefix.
         try:
@@ -124,6 +215,7 @@ class Dumper( SimpleItem ):
         return 0
             
 
+    security.declarePrivate( '_dumpObjects' )
     def _dumpObjects( self, objects, path=None ):
         #   Dump each item, using path as prefix.
         dumped = []
@@ -136,6 +228,7 @@ class Dumper( SimpleItem ):
         return dumped
 
 
+    security.declarePrivate( '_writeProperties' )
     def _writeProperties( self, obj, file ):
         propIDs = obj.propertyIds()
         propIDs.sort()  # help diff out :)
@@ -147,6 +240,7 @@ class Dumper( SimpleItem ):
     #
     #   Type-specific dumpers
     #
+    security.declarePrivate( '_dumpFolder' )
     def _dumpFolder( self, obj, path=None ):
         #   Recurse to dump items in a folder.
         if path is None:
@@ -162,6 +256,7 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
 
+    security.declarePrivate( '_dumpDTML' )
     def _dumpDTML( self, obj, path=None, suffix='dtml' ):
         #   Dump obj (assumed to be a DTML Method/Document) to the
         #   filesystem as a file, appending ".dtml" to the name.
@@ -173,12 +268,14 @@ class Dumper( SimpleItem ):
         file.write( text )
         file.close()
 
+    security.declarePrivate( '_dumpDTMLMethod' )
     def _dumpDTMLMethod( self, obj, path=None ):
         self._dumpDTML( obj, path )
         file = self._createFile( path, '%s.properties' % obj.id() )
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
+    security.declarePrivate( '_dumpDTMLDocument' )
     def _dumpDTMLDocument( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a DTML Document) to the
         #   filesystem as a file, appending ".dtml" to the name.
@@ -187,6 +284,7 @@ class Dumper( SimpleItem ):
         self._writeProperties( obj, file )
         file.close()
 
+    security.declarePrivate( '_dumpExternalMethod' )
     def _dumpExternalMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, appending ".py" to the name.
@@ -196,6 +294,7 @@ class Dumper( SimpleItem ):
         file.write( 'function:string=%s\n' % obj._function )
         file.close()
 
+    security.declarePrivate( '_dumpFileOrImage' )
     def _dumpFileOrImage( self, obj, path=None ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, appending ".py" to the name.
@@ -214,6 +313,7 @@ class Dumper( SimpleItem ):
                 data = data.next
         file.close()
 
+    security.declarePrivate( '_dumpPythonMethod' )
     def _dumpPythonMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Python Method) to the
         #   filesystem as a file, appending ".py" to the name.
@@ -229,6 +329,7 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
+    security.declarePrivate( '_dumpSQLMethod' )
     def _dumpSQLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a SQL Method) to the
         #   filesystem as a file, appending ".sql" to the name.
@@ -248,6 +349,7 @@ class Dumper( SimpleItem ):
         file.write( 'class_file_:string=%s\n' % obj.class_file_ )
         file.close()
 
+    security.declarePrivate( '_dumpZCatalog' )
     def _dumpZCatalog( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZCatalog) to the
         #   filesystem as a file, appending ".catalog" to the name.
@@ -269,6 +371,7 @@ class Dumper( SimpleItem ):
             file.write( '%s\n' % column )
         file.close()
     
+    security.declarePrivate( '_dumpZClass' )
     def _dumpZClass( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZClass) to the
         #   filesystem as a directory, including propertysheets and
@@ -325,6 +428,7 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
     
+    security.declarePrivate( '_dumpZClassPropertySheet' )
     def _dumpZClassPropertySheet( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZClass) to the
         #   filesystem as a directory, including propertysheets and
@@ -337,6 +441,7 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
     
+    security.declarePrivate( '_dumpPermission' )
     def _dumpPermission( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Zope Permission) to the
         #   filesystem as a .properties file.
@@ -345,6 +450,7 @@ class Dumper( SimpleItem ):
         file.write( 'name:string=%s\n' % obj.name )
         file.close()
 
+    security.declarePrivate( '_dumpFactory' )
     def _dumpFactory( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Zope Factory) to the
         #   filesystem as a .properties file.
@@ -355,6 +461,7 @@ class Dumper( SimpleItem ):
         file.write( 'permission:string=%s\n' % obj.permission )
         file.close()
 
+    security.declarePrivate( '_dumpWizard' )
     def _dumpWizard( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Wizard) to the
         #   filesystem as a directory, containing a .properties file
@@ -379,6 +486,7 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
 
+    security.declarePrivate( '_dumpWizardPage' )
     def _dumpWizardPage( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a WizardPage) to the
         #   filesystem as a file, appending ".wizardpage" to the name.
@@ -406,6 +514,7 @@ class Dumper( SimpleItem ):
                #, 'SQL DB Conn'     : _dumpDBConn
                 }
 
+    security.declareProtected( USE_DUMPER_PERMISSION, 'testDump' )
     def testDump( self, peer_path, path=None, REQUEST=None ):
         """
             Test dumping a single item.
@@ -418,4 +527,6 @@ class Dumper( SimpleItem ):
                                         + '?manage_tabs_message=%s+dumped.'
                                         % peer_path
                                         )
+
+InitializeClass( Dumper )
 
