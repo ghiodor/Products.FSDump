@@ -1,1 +1,1 @@
-QueueCatalog-1.0+
+QueueCatalog-1.1
