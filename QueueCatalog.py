@@ -299,7 +299,7 @@ class QueueCatalog(Implicit, SimpleItem):
             if max:
                 # limit the number of events
                 limit = max - count
-
+        
             events = queue.process(limit)
 
             for uid, (t, event) in events.items():
@@ -332,14 +332,13 @@ class QueueCatalog(Implicit, SimpleItem):
     def indexObject(self, object):
         """Add to catalog.
         """
-        self.catalog_object(object)
+        self.catalog_object(object, self.uidForObject(object))
 
     security.declarePrivate('unindexObject')
     def unindexObject(self, object):
         """Remove from catalog.
         """
-        url = '/'.join(object.getPhysicalPath())
-        self.uncatalog_object(url)
+        self.uncatalog_object(self.uidForObject(object))
 
     security.declarePrivate('reindexObject')
     def reindexObject(self, object, idxs=[]):
@@ -349,7 +348,19 @@ class QueueCatalog(Implicit, SimpleItem):
         to update (all of them by default).
         """
         # Punt for now and ignore idxs.
-        self.catalog_object(object)
+        self.catalog_object(object, self.uidForObject(object))
+
+    security.declarePrivate('uidForObject')
+    def uidForObject(self, obj):
+        """Get a catalog uid for the object. Allows the underlying catalog
+        to determine the uids if it implements this method"""
+        catalog = self.getZCatalog()
+        try:
+            uidForObject = aq_base(catalog).uidForObject
+        except AttributeError:
+            return '/'.join(obj.getPhysicalPath())
+        else:
+            return uidForObject(obj)
 
     # Provide web pages. It would be nice to use views, but Zope 2.6
     # just isn't ready for views. :( In particular, we'd have to fake

@@ -106,7 +106,13 @@ class QueueCatalogTests(unittest.TestCase):
         self.assertEqual(len(info), 2)
         self.assert_({'id': 'id', 'meta_type': 'FieldIndex'} in info)
         self.assert_({'id': 'meta_type', 'meta_type': 'FieldIndex'} in info)
-
+        
+    
+    def testRealCatSpecifiesUids(self):
+        def stupidUidMaker(self, obj):
+            return '/stupid/uid'
+        ZCatalog.uidForObject = stupidUidMaker # monkey patch
+        self.assertEqual(self.app.queue_cat.uidForObject(None), '/stupid/uid')
 
 # Enable this test when DemoStorage supports conflict resolution.
 
