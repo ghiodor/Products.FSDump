@@ -1,0 +1,35 @@
+<html>
+<head>
+<title> Edit Filesystem Dumper </title>
+</head>
+<body bgcolor="#ffffff" link="#000099" vlink="#555555" alink="#77003b">
+<dtml-var manage_tabs>
+
+<form action="&dtml-absolute_url;" method="post">
+<table>
+
+ <tr valign="top">
+  <th align="right"> ID: </th>
+  <td> <dtml-var id> </td>
+ </tr>
+
+ <tr valign="top">
+  <th align="right"> Filesystem path: </th>
+  <td>
+   <input type="text" name="fspath" size="40" value="&dtml-fspath;">
+  </td>
+ </tr>
+
+ <tr valign="top">
+  <td> <br> </td>
+  <td>
+   <input type="submit" name="edit:method" value="Change">
+   <input type="submit" name="dumpToFS:method" value="Change and Dump">
+  </td>
+ </tr>
+
+</table>
+</form>
+
+</body>
+</html>
