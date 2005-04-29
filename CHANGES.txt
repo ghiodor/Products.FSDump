@@ -1,6 +1,6 @@
 FSDump Change Log
 
-  After FSDump 0.8.1
+  FSDump 0.9 (2005/04/29)
 
     - Merged Andy Fundinger's work, adding handlers for the following
       CMFFormController meta_types:
