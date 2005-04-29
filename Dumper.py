@@ -301,6 +301,39 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
+    security.declarePrivate( '_dumpControllerPythonScript' )
+    def _dumpControllerPythonScript( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a Python Script) to the
+        #   filesystem as a file, with the accompanyting properties file.
+        file = self._createFile( path, '%s.cpy' % obj.id )
+        file.write( obj.read() )
+        file.close()
+        file = self._createMetadataFile( path, '%s.cpy' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.close()
+
+    security.declarePrivate( '_dumpValidatorScript' )
+    def _dumpValidatorScript( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a Controller Validator) to the
+        #   filesystem as a file, with the accompanyting properties file.
+        file = self._createFile( path, '%s.vpy' % obj.id )
+        file.write( obj.read() )
+        file.close()
+        file = self._createMetadataFile( path, '%s.vpy' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.close()
+
+    security.declarePrivate( '_dumpControllerPageTemplate' )
+    def _dumpControllerPageTemplate( self, obj, path=None ):
+        #   Dump properties of obj (assumed to be a ZopeControllerPageTemplate) to the
+        #   filesystem as a file, with the accompanyting properties file.
+        file = self._createFile( path, '%s.cpt' % obj.id )
+        file.write( obj.read() )
+        file.close()
+        file = self._createMetadataFile( path, '%s.cpt' % obj.id )
+        file.write( 'title:string=%s\n' % obj.title )
+        file.close()
+
     security.declarePrivate( '_dumpPageTemplate' )
     def _dumpPageTemplate( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZopePageTemplate) to the
@@ -486,6 +519,9 @@ class Dumper( SimpleItem ):
                 , 'Image'           : _dumpFileOrImage
                 , 'Python Method'   : _dumpPythonMethod
                 , 'Script (Python)' : _dumpPythonScript
+                , 'Controller Python Script' : _dumpControllerPythonScript
+                , 'Controller Validator' : _dumpValidatorScript
+                , 'Controller Page Template' : _dumpControllerPageTemplate
                 , 'Page Template'   : _dumpPageTemplate
                 , 'Z SQL Method'    : _dumpSQLMethod
                 , 'ZCatalog'        : _dumpZCatalog
