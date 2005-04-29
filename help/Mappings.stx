@@ -95,11 +95,11 @@ Mapping TTW Code to the Filesystem
 
     'Zope Permission'
 
-        - Store values in "*.properties".
+        - Store values in '*.properties'.
 
     'Zope Factory'
 
-        - Store values in "*.properties".
+        - Store values in '*.properties'.
 
     'Wizard'
 
@@ -112,5 +112,35 @@ Mapping TTW Code to the Filesystem
     'WizardPage'
 
         - Store text in "*.wizardpage'.
+
+        - Store properties in '*.properties'.
+
+    'PageTemplate'
+
+        - Create a single file containng the text of the template.
+          Filename will have extension, '.pt'.
+
+        - Store properties in '*.properties'.
+
+    'Controller Python Script'
+
+        - Create a module containing a single top-level function
+          definition, using the "read" format (bindings in comments
+          at the top).  Filename will have extension, '.cpy'
+
+        - Store properties in '*.properties'.
+
+    'Controller Validator'
+
+        - Create a module containing a single top-level function
+          definition, using the "read" format (bindings in comments
+          at the top).  Filename will have extension, '.vpy'
+
+        - Store properties in '*.properties'.
+
+    'Controller Page Template'
+
+        - Create a single file containng the text of the template.
+          Filename will have extension, '.cpt'.
 
         - Store properties in '*.properties'.

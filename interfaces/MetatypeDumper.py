@@ -1,6 +1,14 @@
-from Interfaces import Base
+""" FSDump plugin interface:  MetatypeDumper
 
-class MetatypeDumper( Base ):
+$Id$
+"""
+
+try:
+    from zope.interface import Interface
+except ImportError: # Zope < 2.8.0a2
+    from Interfaces import Interface
+
+class MetatypeDumper( Interface ):
     """
         Interface for instance / method / function which allows
         dumping objects of a given metatype to the filesystem.
