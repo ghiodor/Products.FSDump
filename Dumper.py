@@ -139,7 +139,10 @@ class Dumper( SimpleItem ):
         fullpath = "%s/%s.%s" % ( self._checkFSPath( path )
                                 , filename, extension )
         file = open( fullpath, mode )
-        print >> file, "[Default]"
+        if self.use_metadata_file:
+            print >> file, "[default]"
+        else:
+            print >> file, "[Default]"
         return file
     
     security.declarePrivate( '_dumpObject' )
@@ -177,7 +180,10 @@ class Dumper( SimpleItem ):
         for propID in propIDs:
             type = obj.getPropertyType( propID )
             value = obj.getProperty( propID )
-            file.write( '%s:%s=%s\n' % ( propID, type, value ) )
+            if self.use_metadata_file and type=='string':
+                file.write( '%s=%s\n' % ( propID, value ) )
+            else:
+                file.write( '%s:%s=%s\n' % ( propID, type, value ) )
 
     #
     #   Type-specific dumpers
@@ -219,13 +225,36 @@ class Dumper( SimpleItem ):
         file.write( text )
         file.close()
 
+    security.declarePrivate( '_dumpSecurityInfo' )
+    def _dumpSecurityInfo(self, obj, file):
+        if getattr(obj.aq_base, '_proxy_roles', None):
+            file.write('proxy=%s\n' % ','.join(obj._proxy_roles))
+        security_header_written = 0
+        valid_roles = obj.valid_roles()
+        for perm_dict in obj.permission_settings():
+            perm_name = perm_dict['name']
+            acquire = (perm_dict['acquire'] and 1) or 0
+            roles = []
+            for role_idx in range(len(valid_roles)):
+                if perm_dict['roles'][role_idx]['checked']:
+                    roles.append(valid_roles[role_idx])
+            if roles or (acquire==0):
+                if not security_header_written:
+                    security_header_written = 1
+                    file.write('\n[security]\n')
+                file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
+
     security.declarePrivate( '_dumpDTMLMethod' )
     def _dumpDTMLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a DTML Method) to the
         #   filesystem as a file, with the accompanyting properties file.
         self._dumpDTML( obj, path )
         file = self._createMetadataFile( path, '%s.dtml' % obj.id() )
-        file.write( 'title:string=%s\n' % obj.title )
+        if self.use_metadata_file:
+            file.write( 'title=%s\n' % obj.title )
+            self._dumpSecurityInfo(obj, file)
+        else:
+            file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpDTMLDocument' )
@@ -242,9 +271,15 @@ class Dumper( SimpleItem ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file.
         file = self._createMetadataFile( path, '%s.em' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'module:string=%s\n' % obj._module )
-        file.write( 'function:string=%s\n' % obj._function )
+        if self.use_metadata_file:
+            file.write( 'title=%s\n' % obj.title )
+            file.write( 'module=%s\n' % obj._module )
+            file.write( 'function=%s\n' % obj._function )
+            self._dumpSecurityInfo(obj, file)
+        else:
+            file.write( 'title:string=%s\n' % obj.title )
+            file.write( 'module:string=%s\n' % obj._module )
+            file.write( 'function:string=%s\n' % obj._function )
         file.close()
 
     security.declarePrivate( '_dumpFileOrImage' )
@@ -252,9 +287,14 @@ class Dumper( SimpleItem ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, with the accompanyting properties file.
         file = self._createMetadataFile( path, '%s' % obj.id() )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'content_type:string=%s\n' % obj.content_type )
-        file.write( 'precondition:string=%s\n' % obj.precondition )
+        if self.use_metadata_file:
+            file.write( 'title=%s\n' % obj.title )
+            file.write( 'content_type=%s\n' % obj.content_type )
+            file.write( 'precondition=%s\n' % obj.precondition )
+        else:
+            file.write( 'title:string=%s\n' % obj.title )
+            file.write( 'content_type:string=%s\n' % obj.content_type )
+            file.write( 'precondition:string=%s\n' % obj.precondition )
         file.close()
         file = self._createFile( path, obj.id(), 'wb' )
         data = obj.data
@@ -279,7 +319,11 @@ class Dumper( SimpleItem ):
         file.write( text )
         file.close()
         file = self._createMetadataFile( path, '%s.py' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
+        if self.use_metadata_file:
+            file.write( 'title=%s\n' % obj.title )
+            self._dumpSecurityInfo(obj, file)
+        else:
+            file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpPythonScript' )
@@ -290,7 +334,11 @@ class Dumper( SimpleItem ):
         file.write( obj.read() )
         file.close()
         file = self._createMetadataFile( path, '%s.py' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
+        if self.use_metadata_file:
+            file.write( 'title=%s\n' % obj.title )
+            self._dumpSecurityInfo(obj, file)
+        else:
+            file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpControllerPythonScript' )
@@ -334,7 +382,11 @@ class Dumper( SimpleItem ):
         file.write( obj.read() )
         file.close()
         file = self._createMetadataFile( path, '%s.pt' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
+        if self.use_metadata_file:
+            file.write( 'title=%s\n' % obj.title )
+            self._dumpSecurityInfo(obj, file)
+        else:
+            file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     security.declarePrivate( '_dumpSQLMethod' )
