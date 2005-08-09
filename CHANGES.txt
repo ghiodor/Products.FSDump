@@ -1,6 +1,11 @@
 FSDump Change Log
 
-  After FSDump 0.9
+  FSDump 0.9.1 (2005/08/09)
+
+    - CVS tag:  'FSDump-0_9_1'
+
+    - Added argument to Dumper factory to allow caller to supply handler
+      overrides.
 
     - Applied patch from Sam Brauer, addressing the following issues:
 
@@ -14,6 +19,8 @@ FSDump Change Log
         are likely still broken).
       
   FSDump 0.9 (2005/04/29)
+
+    - CVS tag:  'FSDump-0_9'
 
     - Merged Andy Fundinger's work, adding handlers for the following
       CMFFormController meta_types:
