@@ -2,7 +2,7 @@ FSDump Product
 
   Author
 
-    "Tres Seaver", mailto:tseaver@zope.com, Zope Corporation
+    "Tres Seaver", mailto:tseaver@palladion.com, Palladion Software
 
   Overview
 
