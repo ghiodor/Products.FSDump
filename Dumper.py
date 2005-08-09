@@ -18,20 +18,12 @@ addDumperForm = PageTemplateFile( 'addDumper', _wwwdir )
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
-def addDumper( self
-             , id
-             , fspath=None
-             , use_metadata_file=0
-             , handler_overrides=None
-             , REQUEST=None
-             ):
+def addDumper( self, id, fspath=None, use_metadata_file=0, REQUEST=None ):
     """
     """
     dumper = Dumper()
     dumper.id = id
     dumper.edit( fspath, use_metadata_file )
-    if handler_overrides is not None:
-        self._handlers.update(dict(handler_overrides))
     self._setObject( id, dumper )
 
     if REQUEST is not None:
