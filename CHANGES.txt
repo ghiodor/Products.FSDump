@@ -1,5 +1,10 @@
 FSDump Change Log
 
+  After FSDump 0.9.2
+
+    - Applied patch from Willi Langenburger, adding a handler for ZWikiPage
+      objects.
+
   FSDump 0.9.2 (2005/08/09)
 
     - CVS tag:  'FSDump-0_9_2'

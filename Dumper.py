@@ -257,6 +257,22 @@ class Dumper( SimpleItem ):
             file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
+    security.declarePrivate( '_dumpZWikiPage' )
+    def _dumpZWikiPage( self, obj, path=None, suffix='zwiki' ):
+        peer_id = obj.id()
+        file = self._createFile( path, '%s.%s' % ( peer_id, suffix ) )
+        text = obj.text()
+        if text[-1] != '\n':
+            text = '%s\n' % text
+        file.write( text )
+        file.close()
+
+        if self.use_metadata_file:
+            file = self._createMetadataFile( path, '%s.%s' % ( peer_id,suffix))
+            self._writeProperties( obj, file )
+            self._dumpSecurityInfo(obj, file)
+            file.close()
+
     security.declarePrivate( '_dumpDTMLDocument' )
     def _dumpDTMLDocument( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a DTML Document) to the
@@ -577,6 +593,7 @@ class Dumper( SimpleItem ):
                 , 'Wizard'          : _dumpWizard
                 , 'Wizard Page'     : _dumpWizardPage
                #, 'SQL DB Conn'     : _dumpDBConn
+                , 'ZWiki Page'      : _dumpZWikiPage
                 }
 
     security.declareProtected( USE_DUMPER_PERMISSION, 'testDump' )
