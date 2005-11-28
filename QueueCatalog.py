@@ -55,6 +55,11 @@ _zcatalog_methods = {
     '__call__': 1,
     'refreshCatalog': 1,
     'Indexes': 1,
+    'unrestrictedSearchResults': 1,
+    'manage_addIndex': 1,
+    'manage_addColumn': 1,
+    'manage_catalogClear': 1,
+    'getIndexObjects': 1,
     }
 
 _is_zcatalog_method = _zcatalog_methods.has_key
@@ -254,8 +259,7 @@ class QueueCatalog(Implicit, SimpleItem):
         # update metadata during queue processing, rather than immediately
 
         # similarly, limiting the idxs only limits the immediate indexes.  If
-        # any work needs to be done in the queue processing, it will all be 
-        # done: we have not implemented partial indexing during queue
+        # any work needs to be done in the queue processing, it will all be         # done: we have not implemented partial indexing during queue
         # processing.  The only way to avoid any of it is to avoid all of it
         # (i.e., update metadata immediately and don't have any indexes to
         # update on the queued side).
@@ -372,8 +376,7 @@ class QueueCatalog(Implicit, SimpleItem):
                 except (ConflictError, ClientDisconnected):
                     raise
                 except:
-                    LOG('QueueCatalog', ERROR, 'error uncataloging object', 
-                        error=sys.exc_info())
+                    LOG('QueueCatalog', ERROR, 'error uncataloging object',                         error=sys.exc_info())
             else:
                 # add or change
                 if event is CHANGED and not cataloged(catalog, uid):
@@ -413,13 +416,14 @@ class QueueCatalog(Implicit, SimpleItem):
         self.uncatalog_object(self.uidForObject(object))
 
     security.declarePrivate('reindexObject')
-    def reindexObject(self, object, idxs=None):
+    def reindexObject(self, object, idxs=None,update_metadata=1,uid=None):
         """Update catalog after object data has changed.
 
         The optional idxs argument is a list of specific indexes
         to update (all of them by default).
         """
-        self.catalog_object(object, self.uidForObject(object), idxs=idxs)
+        self.catalog_object(object, uid or self.uidForObject(object), idxs=idxs,
+                            update_metadata=update_metadata)
 
     security.declarePrivate('uidForObject')
     def uidForObject(self, obj):
