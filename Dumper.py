@@ -571,6 +571,14 @@ class Dumper( SimpleItem ):
         self._writeProperties( obj, file )
         file.close()
 
+    security.declarePrivate( '_dumpFormulatorForm' )
+    def _dumpFormulatorForm( self, obj, path=None ):
+        if path is None:
+            path = ''
+        file = self._createFile(path, obj.id + '.form')
+        file.write(obj.get_xml())
+        file.close()
+
     _handlers = { 'DTML Method'     : _dumpDTMLMethod
                 , 'DTML Document'   : _dumpDTMLDocument
                 , 'Folder'          : _dumpFolder
@@ -592,6 +600,7 @@ class Dumper( SimpleItem ):
                 , 'Zope Factory'    : _dumpFactory
                 , 'Wizard'          : _dumpWizard
                 , 'Wizard Page'     : _dumpWizardPage
+                , 'Formulator Form' : _dumpFormulatorForm
                #, 'SQL DB Conn'     : _dumpDBConn
                 , 'ZWiki Page'      : _dumpZWikiPage
                 }
