@@ -416,11 +416,11 @@ class Dumper( SimpleItem ):
         file.write( 'arguments: %s\n'
                      % ' '.join(obj.arguments_src.splitlines() ) )
         file.write( 'connection_id:%s\n' % obj.connection_id )
-        file.write( 'max_rows_:%s\n' % obj.max_rows_ )
-        file.write( 'max_cache_:%s\n' % obj.max_cache_ )
-        file.write( 'cache_time_:%s\n' % obj.cache_time_ )
-        file.write( 'class_name_:%s\n' % obj.class_name_ )
-        file.write( 'class_file_:%s\n' % obj.class_file_ )
+        file.write( 'max_rows:%s\n' % obj.max_rows_ )
+        file.write( 'max_cache:%s\n' % obj.max_cache_ )
+        file.write( 'cache_time:%s\n' % obj.cache_time_ )
+        file.write( 'class_name:%s\n' % obj.class_name_ )
+        file.write( 'class_file:%s\n' % obj.class_file_ )
         file.write( '</dtml-comment>\n')
         if text[-1] != '\n':
             text = '%s\n' % text

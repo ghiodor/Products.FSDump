@@ -2,6 +2,9 @@ FSDump Change Log
 
   After FSDump 0.9.2
 
+    - Applied patch from Damine Baty, fixing the output of dumping ZSQLMethods
+      to match the format used by CMF's FSZSQLMethods.
+      
     - Applied patch from Alejo Roda, adding a handler for Formulator forms.
 
     - Applied patch from Willi Langenburger, adding a handler for ZWikiPage
