@@ -16,9 +16,13 @@ def _doc_file(name):
     return f.read()
 
 _boundary = '\n' + ('-' * 60) + '\n\n'
-README = (_doc_file('README.txt')
+README = (_doc_file('Overview.rst')
          + _boundary
-         + _doc_file('CHANGES.txt')
+         + _doc_file('Dumper_editForm.rst')
+         + _boundary
+         + _doc_file('Mappings.rst')
+         + _boundary
+         + _doc_file('CHANGES.rst')
          + _boundary
          + "Download\n========"
          )

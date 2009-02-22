@@ -4,12 +4,18 @@ FSDump Change Log
 0.9.4 (2009-02-22)
 ------------------
 
+- SVN:  http://svn.zope.org/Products.FSDump/tags/0.9.4
+
 - Repackaged as a Python egg.
 
 - Converted docs to ReStructured text.
 
+- Moved from CVS to SVN.
+
 0.9.3 (2006-12-20)
 ------------------
+
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9_3
 
 - Applied patch from Damine Baty, fixing the output of dumping ZSQLMethods
   to match the format used by CMF's FSZSQLMethods.
@@ -22,14 +28,18 @@ FSDump Change Log
 0.9.2 (2005-08-09)
 -------------------------
 
-- CVS tag:  'FSDump-0_9_2'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9_2
 
-- Reverted 'handler_overrides' brownbag
+- CVS tag:  ``FSDump-0_9_2``
+
+- Reverted ``handler_overrides`` brownbag
 
 0.9.1 (2005-08-09)
 ------------------
 
-- CVS tag:  'FSDump-0_9_1'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9_1
+
+- CVS tag:  ``FSDump-0_9_1``
 
 - Added argument to Dumper factory to allow caller to supply handler
   overrides.
@@ -37,18 +47,20 @@ FSDump Change Log
 - Applied patch from Sam Brauer, addressing the following issues:
 
   * Proxy roles and security settings weren't being written to
-    the '.metadata' file.
+    the ``.metadata`` file.
 
-  * The '[Default]' section should be named '[default]'.
+  * The ``[Default]`` section should be named ``[default]``.
 
   * The property-type extensions confuse CMF's FilesystemDirectoryView
-    (the patch removes the ':string' for string properties;  others
+    (the patch removes the ``:string`` for string properties;  others
     are likely still broken).
   
 0.9 (2005-04-29)
 ----------------
 
-- CVS tag:  'FSDump-0_9'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9
+
+- CVS tag:  ``FSDump-0_9``
 
 - Merged Andy Fundinger's work, adding handlers for the following
   CMFFormController meta_types:
@@ -68,7 +80,9 @@ FSDump Change Log
 0.8.1 (2004-12-09)
 ------------------
 
-- CVS tag:  'FSDump-0_8_1'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_8_1
+
+- CVS tag:  ``FSDump-0_8_1``
 
 - Repackaged to nest the actual products directory inside a version-
   qualified wrapper directory;  added an INSTALL.txt in the wrapper.
@@ -76,7 +90,9 @@ FSDump Change Log
 0.8 (2004-10-13)
 ----------------
 
-- CVS tag:  'FSDump-0_8'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_8
+
+- CVS tag:  ``FSDump-0_8``
 
 - Applied patch from Zope collector #1463 to make dumped SQL methods
   fit better with CMF's FSSQLMethod representation.
@@ -84,9 +100,11 @@ FSDump Change Log
 0.7 (2004-05-17)
 ----------------
 
-- CVS tag:  'FSDump-0_7'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_7
 
-- Added knob to force use of single '.metadata' file, rather than
+- CVS tag:  ``FSDump-0_7``
+
+- Added knob to force use of single ``.metadata`` file, rather than
   multiples (CMF 1.4 compatibility).
 
 - Migrated ZMI to use PageTemplates.
@@ -97,7 +115,9 @@ FSDump Change Log
 0.6 (2001-08-09)
 ----------------
 
-- CVS tag:  'FSDump-0_6'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_6
+
+- CVS tag:  ``FSDump-0_6``
 
 - Add handlers for:
 
@@ -106,7 +126,9 @@ FSDump Change Log
 0.5 (2001-08-03)
 ----------------
 
-- CVS tag:  'FSDump-0_5'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_5
+
+- CVS tag:  ``FSDump-0_5``
 
 - Add handlers for:
 
@@ -115,7 +137,9 @@ FSDump Change Log
 0.4 (2001-06-18)
 ----------------
 
-- CVS tag:  'FSDump-0_4'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_4
+
+- CVS tag:  ``FSDump-0_4``
 
 - Conform to the "Finished Project Guidelines",
   http://dev.zope.org/Wikis/DevSite/Proposals/FinishedProductGuidelines
@@ -126,6 +150,8 @@ FSDump Change Log
 
 0.3 (2001-01-06)
 ----------------
+
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_3
 
 - No CVS tag?
 
@@ -140,7 +166,9 @@ FSDump Change Log
 0.2 (2000-11-19)
 ----------------
 
-- CVS tag:  'FSDump-0_2'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_2
+
+- CVS tag:  ``FSDump-0_2``
 
 - Add handlers for:
 
@@ -152,12 +180,13 @@ FSDump Change Log
 
   * TTW Factories
 
-- Fix unixism in 'Dumper._setFSPath()' -- thanks
-  Craig! (cba@mediaone.net)
+- Fix unixism in ``Dumper._setFSPath()`` -- thanks Craig! (cba@mediaone.net)
 
-FSDump 0.1 (2000-11-16)
------------------------
+0.1 (2000-11-16)
+----------------
 
-- CVS tag:  'FSDump-0_1'
+- SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_1
+
+- CVS tag:  ``FSDump-0_1``
 
 - Initial release
