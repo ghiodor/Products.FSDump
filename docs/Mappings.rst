@@ -80,7 +80,7 @@ PageTemplate
 - Create a single file containng the text of the template.  Filename will
   have extension, ``.pt``.
 
-- Store properties in '*.properties'.
+- Store properties in ``*.properties``.
 
 SQL Method
 %%%%%%%%%%
