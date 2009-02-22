@@ -1,146 +1,181 @@
 Mapping TTW Code to the Filesystem
+==================================
 
-  General Mapping
+General Mapping
+---------------
 
-    * Create the most "natural" filesystem analogue for each TTW
-      item:  Folders -> directories, DTML Methods/Documents ->
-      DTML files, PythonMethods -> Python modules.
+- Create the most "natural" filesystem analogue for each TTW
+  item:  Folders -> directories, DTML Methods/Documents ->
+  DTML files, PythonMethods -> Python modules.
 
-    * Trap non-inline properties in a companion file, with a
-      '.properties' suffix.  Store one property per line, using
-      'name:type=value' syntax.
+- Trap non-inline properties in a companion file, with a
+  ``.properties`` suffix.  Store one property per line, using
+  ``name:type=value`` syntax.
 
-      o XXX: in companion ".metadata" file, store the properties
-        in the '[Default]' section.
+  * XXX: in companion ``.metadata`` file, store the properties
+    in the ``[Default]`` section.
 
-    * Map the permission-role map in the '[Permissions]' section of the
-      companion ".metadata" file (XXX this feature not present before
-      the switch to '.metadata', although it might have mapped to the
-      ".security" file supported by CMF 1.3)
+- Map the permission-role map in the ``[Permissions]`` section of the
+  companion ``.metadata`` file (XXX this feature not present before
+  the switch to ``.metadata``, although it might have mapped to the
+  ``.security`` file supported by CMF 1.3)
 
-    * Map local roles in the '[LocalRoles]' section of the
-      companion ".metadata" file (XXX this feature not present before
-      the switch to '.metadata')
+- Map local roles in the ``[LocalRoles]`` section of the
+  companion ``.metadata`` file (XXX this feature not present before
+  the switch to ``.metadata``)
 
-    * Write proxy roles to a 'proxy' property (XXX CMF 1.4 compatibility;
-      this is an *ugly* spelling).  Should probably put it into a "prettier"
-      spelling, as well, and lobby to change the spelling used in CMF.
+- Write proxy roles to a ``proxy`` property (XXX CMF 1.4 compatibility;
+  this is an *ugly* spelling).  Should probably put it into a "prettier"
+  spelling, as well, and lobby to change the spelling used in CMF.
 
-    * Preserve enough metadata to be able to recreate the TTW
-      object, preferably by *using its web interface.*  This rule
-      is the chief differentiator (in concept) from pickling; we
-      don't save state which cannot be set by a TTW manager.
+- Preserve enough metadata to be able to recreate the TTW
+  object, preferably by *using its web interface.*  This rule
+  is the chief differentiator (in concept) from pickling; we
+  don't save state which cannot be set by a TTW manager.
 
-  Specific Mappings
-   
-    'Folder'
+Specific Mappings
+-----------------
 
-        - Recursively store contained items into the folder's
-          directory.
+Folder
+%%%%%%
 
-        - Store a list of the dumped items in an ".objects" file,
-          one line per item, using the format, 'name:meta_type'.
+- Recursively store contained items into the folder's directory.
 
-          o XXX: in ".metadata" file, store the same lines in an
-            '[Objects]' directory.
+- Store a list of the dumped items in an ``.objects`` file,
+  one line per item, using the format, ``name:meta_type``.
 
-    'Python Method'
+  * XXX: in ``.metadata`` file, store the same lines in an
+    ``[Objects]`` directory.
 
-        - Create a module containing a single top-level function
-          definition, using the name, argument list, and body.
+File / Image
+%%%%%%%%%%%%
 
-    'Python Script'
+- Save the file contents themselves in binary format using the item's id.
 
-        - Create a module containing a single top-level function
-          definition, using the "read" format (bindings in comments
-          at the top).
+- Store properties in ``*.properties``.
 
-    'File' / 'Image'
+DTMLMethod
+%%%%%%%%%%
 
-        - Save the file contents themselves in binary format using
-          the item's id.
+- Create a single file containng the text of the template.  Filename will
+  have extension, ``.dtml``.
 
-    'SQL Method'
-    
-        - Inject the parameter list inline into the body, with a
-          leading blank line.
+DTMLDocument
+%%%%%%%%%%%%
 
-    'ZCatalog'
+- Create a single file containng the text of the template.  Filename will
+  have extension, ``.dtml``.
 
-        - Store the paths of the catalogued objects in a
-          "<id>.catalog" file, one line per item.
+- Store properties in ``*.properties``.
 
-        - Store the index definititions in a "<id>.indexes" file,
-          one line per index, using the format, 'name:meta_type'.
+Python Script
+%%%%%%%%%%%%%
 
-        - Store the schema in a "<id>.metadata" file, one line per
-          field name.
+- Create a module containing a single top-level function definition, using
+  the "read" format (bindings in comments at the top).
 
-    'ZClass'
+PageTemplate
+%%%%%%%%%%%%
 
-        - Map to a directory.
+- Create a single file containng the text of the template.  Filename will
+  have extension, ``.pt``.
 
-        - Store "basic" tab values in '.properties'
+- Store properties in '*.properties'.
 
-        - Store icon in '.icon'
+SQL Method
+%%%%%%%%%%
 
-        - Store propertysheets in 'propertysheets/common'.
+- Inject the parameter list inline into the body, with a leading blank line.
 
-        - Store method tab objects (includin nested ZClasses)
-          in 'propertysheets/methods'.
+ZCatalog
+%%%%%%%%
 
-    'Common Instance Property Sheet' (ZClass property sheet)
+- Store the paths of the catalogued objects in a ``<id>.catalog`` file,
+  one line per item.
 
-        - Store properties as name:type=value in file of same name.
+- Store the index definititions in a ``<id>.indexes`` file,
+  one line per index, using the format, ``name:meta_type``.
 
-    'Zope Permission'
+- Store the schema in a ``<id>.metadata`` file, one line per
+  field name.
 
-        - Store values in '*.properties'.
+Controller Python Script
+%%%%%%%%%%%%%%%%%%%%%%%%
 
-    'Zope Factory'
+- Create a module containing a single top-level function
+  definition, using the "read" format (bindings in comments
+  at the top).  Filename will have extension, ``.cpy``
 
-        - Store values in '*.properties'.
+- Store properties in ``*.properties``.
 
-    'Wizard'
+Controller Validator
+%%%%%%%%%%%%%%%%%%%%
 
-        - Map to a directory.
+- Create a module containing a single top-level function
+  definition, using the "read" format (bindings in comments
+  at the top).  Filename will have extension, ``.vpy``
 
-        - Store properties in '.properties'.
+- Store properties in ``*.properties``.
 
-        - Store pages.
+Controller Page Template
+%%%%%%%%%%%%%%%%%%%%%%%%
 
-    'WizardPage'
+- Create a single file containng the text of the template.
+  Filename will have extension, ``.cpt``.
 
-        - Store text in "*.wizardpage'.
+- Store properties in ``*.properties``.
 
-        - Store properties in '*.properties'.
 
-    'PageTemplate'
+Mappings for Obsolete Types
+---------------------------
 
-        - Create a single file containng the text of the template.
-          Filename will have extension, '.pt'.
+Python Method
+%%%%%%%%%%%%%
 
-        - Store properties in '*.properties'.
+- Create a module containing a single top-level function
+  definition, using the name, argument list, and body.
 
-    'Controller Python Script'
+ZClass
+%%%%%%
 
-        - Create a module containing a single top-level function
-          definition, using the "read" format (bindings in comments
-          at the top).  Filename will have extension, '.cpy'
+- Map to a directory.
 
-        - Store properties in '*.properties'.
+- Store "basic" tab values in ``.properties``
 
-    'Controller Validator'
+- Store icon in ``.icon``
 
-        - Create a module containing a single top-level function
-          definition, using the "read" format (bindings in comments
-          at the top).  Filename will have extension, '.vpy'
+- Store propertysheets in ``propertysheets/common``.
 
-        - Store properties in '*.properties'.
+- Store method tab objects (including nested ZClasses)
+  in ``propertysheets/methods``.
 
-    'Controller Page Template'
+Common Instance Property Sheet (ZClass property sheet)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        - Create a single file containng the text of the template.
-          Filename will have extension, '.cpt'.
+- Store properties as ``name:type=value`` in file of same name.
 
-        - Store properties in '*.properties'.
+Zope Permission
+%%%%%%%%%%%%%%%
+
+- Store values in ``*.properties``.
+
+Zope Factory
+%%%%%%%%%%%%
+
+- Store values in ``*.properties``.
+
+Wizard
+%%%%%%
+
+- Map to a directory.
+
+- Store properties in ``.properties``.
+
+- Store pages.
+
+WizardPage
+%%%%%%%%%%
+
+- Store text in ``*.wizardpage``.
+
+- Store properties in ``*.properties``.
