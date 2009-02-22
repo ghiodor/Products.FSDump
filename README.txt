@@ -1,1 +1,4 @@
-Please see Products/FSDump/README.txt
+FSDump Product README
+=====================
+
+See ``docs/index.rst``.

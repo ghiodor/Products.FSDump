@@ -11,10 +11,14 @@ def _package_doc(name):
     f = open(os.path.join(package, name))
     return f.read()
 
+def _doc_file(name):
+    f = open(os.path.join('docs', name))
+    return f.read()
+
 _boundary = '\n' + ('-' * 60) + '\n\n'
-README = (_package_doc('README.txt')
+README = (_doc_file('README.txt')
          + _boundary
-         + _package_doc('CHANGES.txt')
+         + _doc_file('CHANGES.txt')
          + _boundary
          + "Download\n========"
          )
