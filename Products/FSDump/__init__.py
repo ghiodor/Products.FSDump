@@ -15,6 +15,3 @@ def initialize( context ):
                          , permission= 'Add Dumper'
                          , icon='www/dumper.gif'
                          )
-
-    context.registerHelpTitle( 'FSDump Help' )
-    context.registerHelp( directory='help' )

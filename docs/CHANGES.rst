@@ -4,6 +4,8 @@ FSDump Change Log
 After 0.9.4
 -----------
 
+- Removed broken HelpSys registrations.
+
 - Fixed the version number used in making the sdist.
 
 
