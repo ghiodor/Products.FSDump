@@ -1,8 +1,8 @@
-FSDump Change Log
-=================
+FSDump Changelog
+================
 
-After 0.9.4
------------
+0.9.5 (2009-11-03)
+------------------
 
 - Removed broken HelpSys registrations.
 
