@@ -1,6 +1,12 @@
 FSDump Change Log
 =================
 
+After 0.9.4
+-----------
+
+- Fixed the version number used in making the sdist.
+
+
 0.9.4 (2009-02-22)
 ------------------
 
@@ -11,6 +17,7 @@ FSDump Change Log
 - Converted docs to ReStructured text.
 
 - Moved from CVS to SVN.
+
 
 0.9.3 (2006-12-20)
 ------------------
@@ -25,6 +32,7 @@ FSDump Change Log
 - Applied patch from Willi Langenburger, adding a handler for ZWikiPage
   objects.
 
+
 0.9.2 (2005-08-09)
 -------------------------
 
@@ -33,6 +41,7 @@ FSDump Change Log
 - CVS tag:  ``FSDump-0_9_2``
 
 - Reverted ``handler_overrides`` brownbag
+
 
 0.9.1 (2005-08-09)
 ------------------
@@ -54,6 +63,7 @@ FSDump Change Log
   * The property-type extensions confuse CMF's FilesystemDirectoryView
     (the patch removes the ``:string`` for string properties;  others
     are likely still broken).
+
   
 0.9 (2005-04-29)
 ----------------
@@ -77,6 +87,7 @@ FSDump Change Log
 - Applied a patch from Willi Langenburger to permit use of a dumper
   in the root of the Zope instance.
 
+
 0.8.1 (2004-12-09)
 ------------------
 
@@ -87,6 +98,7 @@ FSDump Change Log
 - Repackaged to nest the actual products directory inside a version-
   qualified wrapper directory;  added an INSTALL.txt in the wrapper.
 
+
 0.8 (2004-10-13)
 ----------------
 
@@ -96,6 +108,7 @@ FSDump Change Log
 
 - Applied patch from Zope collector #1463 to make dumped SQL methods
   fit better with CMF's FSSQLMethod representation.
+
 
 0.7 (2004-05-17)
 ----------------
@@ -112,6 +125,7 @@ FSDump Change Log
 - Bug:  when synthesizing a file extension, Dumper didn't include the
   synthesized extension in the name of the "companion" properties file.
 
+
 0.6 (2001-08-09)
 ----------------
 
@@ -123,6 +137,7 @@ FSDump Change Log
 
   - PageTemplate
 
+
 0.5 (2001-08-03)
 ----------------
 
@@ -133,6 +148,7 @@ FSDump Change Log
 - Add handlers for:
 
   - PythonScript
+
 
 0.4 (2001-06-18)
 ----------------
@@ -148,6 +164,7 @@ FSDump Change Log
 
 - Moved to use declarative security.
 
+
 0.3 (2001-01-06)
 ----------------
 
@@ -162,6 +179,7 @@ FSDump Change Log
   * Wizards
 
   * Wizard Pages
+
 
 0.2 (2000-11-19)
 ----------------
@@ -179,6 +197,7 @@ FSDump Change Log
   * TTW Permissions
 
   * TTW Factories
+
 
 - Fix unixism in ``Dumper._setFSPath()`` -- thanks Craig! (cba@mediaone.net)
 
