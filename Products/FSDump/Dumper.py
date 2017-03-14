@@ -582,6 +582,7 @@ class Dumper( SimpleItem ):
     _handlers = { 'DTML Method'     : _dumpDTMLMethod
                 , 'DTML Document'   : _dumpDTMLDocument
                 , 'Folder'          : _dumpFolder
+                , 'BTreeFolder2'    : _dumpFolder
                 , 'External Method' : _dumpExternalMethod
                 , 'File'            : _dumpFileOrImage
                 , 'Image'           : _dumpFileOrImage
