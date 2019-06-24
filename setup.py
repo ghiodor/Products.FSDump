@@ -5,7 +5,7 @@ from setuptools import find_packages
 NAME = 'FSDump'
 
 here = os.path.abspath(os.path.dirname(__file__))
-package = os.path.join(here, 'Products', NAME)
+package = os.path.join(here, 'src/Products', NAME)
 
 def _package_doc(name):
     f = open(os.path.join(package, name))
@@ -34,20 +34,21 @@ setup(name='Products.%s' % NAME,
       classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Framework :: Plone",
-        "Framework :: Zope2",
+        "Framework :: Zope4",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Zope Public License",
         "Programming Language :: Python",
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
         ],
-      keywords='web application server zope zope2',
+      keywords='web application server zope zope4',
       author="Zope Foundation and Contributors",
       maintainer="Tres Seaver",
       maintainer_email="tseaver@agendaless.com",
       url="http://pypi.python.org/pypi/Products.FSDump",
       license="ZPL 2.1 (http://www.zope.org/Resources/License/ZPL-2.1)",
       packages=find_packages(),
+      package_dir={'': 'src'},
       include_package_data=True,
       namespace_packages=['Products'],
       zip_safe=False,

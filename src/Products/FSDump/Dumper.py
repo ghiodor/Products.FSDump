@@ -2,34 +2,36 @@
 
 $Id$
 """
+
 import os
 
-from AccessControl import ClassSecurityInfo
-from Globals import DTMLFile
-from Globals import package_home
-from Globals import InitializeClass
+from AccessControl.class_init import InitializeClass
+from AccessControl.Permissions import ClassSecurityInfo
+from App.Common import package_home
 from OFS.SimpleItem import SimpleItem
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from ZODB.POSException import ConflictError
 
 _wwwdir = os.path.join( package_home( globals() ), 'www' )
 
-addDumperForm = PageTemplateFile( 'addDumper', _wwwdir )
+manage_addDumperForm = PageTemplateFile('www/addDumper', globals() )
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
-def addDumper( self, id, fspath=None, use_metadata_file=0, REQUEST=None ):
-    """
+
+def manage_addDumper(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
+    """Add a Dumper object to the system
     """
     dumper = Dumper()
     dumper.id = id
-    dumper.edit( fspath, use_metadata_file )
-    self._setObject( id, dumper )
+    dumper.edit(fspath, use_metadata_file)
+    self._setObject(id, dumper)
 
     if REQUEST is not None:
-        REQUEST[ 'RESPONSE' ].redirect( 'manage_main' )
+        REQUEST['RESPONSE'].redirect('manage_main')
 
-class Dumper( SimpleItem ):
+
+class Dumper(SimpleItem):
     """
     """
     meta_type = 'Dumper'
@@ -54,60 +56,64 @@ class Dumper( SimpleItem ):
     #
     index_html = None
 
-    security.declareProtected( USE_DUMPER_PERMISSION, 'editForm' )
-    editForm = PageTemplateFile( 'editDumper', _wwwdir )
+    security.declareProtected(USE_DUMPER_PERMISSION, 'editForm')
+    editForm = PageTemplateFile('www/editDumper', globals())
 
-    security.declareProtected( USE_DUMPER_PERMISSION, 'edit' )
-    def edit( self, fspath, use_metadata_file, REQUEST=None ):
+
+    @security.protected(USE_DUMPER_PERMISSION)
+    def edit(self, fspath, use_metadata_file, REQUEST=None):
         """
             Update the path to which we will dump our peers.
         """
-        self._setFSPath( fspath )
+        self._setFSPath(fspath)
         self.use_metadata_file = use_metadata_file
 
         if REQUEST is not None:
-            REQUEST['RESPONSE'].redirect( self.absolute_url()
-                                        + '/editForm'
-                                        + '?manage_tabs_message=Dumper+updated.'
+            REQUEST['RESPONSE'].redirect(
+                  self.absolute_url()
+                + '/editForm'
+                + '?manage_tabs_message=Dumper+updated.'
                                         )
 
-    security.declareProtected( USE_DUMPER_PERMISSION, 'dumpToFS' )
-    def dumpToFS( self, REQUEST=None ):
+
+    @security.protected(USE_DUMPER_PERMISSION)
+    def dumpToFS(self, REQUEST=None):
         """
             Iterate recursively over our peers, creating simulacra
             of them on the filesystem in 'fspath'
         """
-        if REQUEST and REQUEST.form.has_key( 'fspath' ):
-            self._setFSPath( REQUEST.form[ 'fspath' ] )
+        if REQUEST and REQUEST.form.has_key('fspath'):
+            self._setFSPath(REQUEST.form['fspath'])
 
         parent = self.aq_parent.aq_base
         if getattr(parent, 'isTopLevelPrincipiaApplicationObject', 0):
-            self._dumpRoot( self.aq_parent )
+            self._dumpRoot(self.aq_parent)
         else:
-            self._dumpFolder( self.aq_parent )
+            self._dumpFolder(self.aq_parent)
 
         if REQUEST is not None:
-            REQUEST['RESPONSE'].redirect( self.absolute_url()
-                                        + '/editForm'
-                                        + '?manage_tabs_message=Peers+dumped.'
+            REQUEST['RESPONSE'].redirect(
+                  self.absolute_url()
+                + '/editForm'
+                + '?manage_tabs_message=Peers+dumped.'
                                         )
  
     #
     #   Utility methods
     #
-    security.declarePrivate( '_setFSPath' )
+    @security.private
     def _setFSPath( self, fspath ):
         #   Canonicalize fspath.
         fspath = os.path.normpath( fspath )
         if not os.path.isabs( fspath ):
-            raise "Dumper Error", "Path must be absolute."
+            raise RunTimeError('Dumper Error: path must be absolute.')
         self.fspath = fspath
 
-    security.declarePrivate( '_buildPathString' )
+    @security.private
     def _buildPathString( self, path=None ):
         #   Construct a path string, relative to self.fspath.
         if self.fspath is None:
-           raise "Dumper Error", "Path not set."
+            raise RunTimeError('Dumper Error: Path not set.')
 
         if path is None:
             path = self.fspath
@@ -116,7 +122,7 @@ class Dumper( SimpleItem ):
         
         return path
 
-    security.declarePrivate( '_checkFSPath' )
+    @security.private
     def _checkFSPath( self, path=None ):
         #   Ensure that fspath/path exists.
         path = self._buildPathString( path )
@@ -126,13 +132,13 @@ class Dumper( SimpleItem ):
         
         return path
 
-    security.declarePrivate( '_createFile' )
+    @security.private
     def _createFile( self, path, filename, mode='w' ):
         #   Create/replace file;  return the file object.
         fullpath = "%s/%s" % ( self._checkFSPath( path ), filename )
         return open( fullpath, mode )
 
-    security.declarePrivate( '_createMetadataFile' )
+    @security.private
     def _createMetadataFile( self, path, filename, mode='w' ):
         #   Create/replace file;  return the file object.
         extension = self.use_metadata_file and 'metadata' or 'properties'
@@ -145,7 +151,7 @@ class Dumper( SimpleItem ):
             print >> file, "[Default]"
         return file
     
-    security.declarePrivate( '_dumpObject' )
+    @security.private
     def _dumpObject( self, object, path=None ):
         #   Dump one item, using path as prefix.
         try:
@@ -160,7 +166,7 @@ class Dumper( SimpleItem ):
         return 0
             
 
-    security.declarePrivate( '_dumpObjects' )
+    @security.private
     def _dumpObjects( self, objects, path=None ):
         #   Dump each item, using path as prefix.
         dumped = []
@@ -173,7 +179,7 @@ class Dumper( SimpleItem ):
         return dumped
 
 
-    security.declarePrivate( '_writeProperties' )
+    @security.private
     def _writeProperties( self, obj, file ):
         propIDs = obj.propertyIds()
         propIDs.sort()  # help diff out :)
@@ -188,11 +194,11 @@ class Dumper( SimpleItem ):
     #
     #   Type-specific dumpers
     #
-    security.declarePrivate( '_dumpRoot' )
+    @security.private
     def _dumpRoot( self, obj ):
         self._dumpObjects( obj.objectValues() )
 
-    security.declarePrivate( '_dumpFolder' )
+    @security.private
     def _dumpFolder( self, obj, path=None ):
         #   Recurse to dump items in a folder.
         if path is None:
@@ -213,7 +219,7 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
 
-    security.declarePrivate( '_dumpDTML' )
+    @security.private
     def _dumpDTML( self, obj, path=None, suffix='dtml' ):
         #   Dump obj (assumed to be a DTML Method/Document) to the
         #   filesystem as a file, appending 'suffix' to the name.
@@ -225,7 +231,7 @@ class Dumper( SimpleItem ):
         file.write( text )
         file.close()
 
-    security.declarePrivate( '_dumpSecurityInfo' )
+    @security.private
     def _dumpSecurityInfo(self, obj, file):
         if getattr(obj.aq_base, '_proxy_roles', None):
             file.write('proxy=%s\n' % ','.join(obj._proxy_roles))
@@ -244,7 +250,7 @@ class Dumper( SimpleItem ):
                     file.write('\n[security]\n')
                 file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
 
-    security.declarePrivate( '_dumpDTMLMethod' )
+    @security.private
     def _dumpDTMLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a DTML Method) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -257,7 +263,7 @@ class Dumper( SimpleItem ):
             file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpZWikiPage' )
+    @security.private
     def _dumpZWikiPage( self, obj, path=None, suffix='zwiki' ):
         peer_id = obj.id()
         file = self._createFile( path, '%s.%s' % ( peer_id, suffix ) )
@@ -273,7 +279,7 @@ class Dumper( SimpleItem ):
             self._dumpSecurityInfo(obj, file)
             file.close()
 
-    security.declarePrivate( '_dumpDTMLDocument' )
+    @security.private
     def _dumpDTMLDocument( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a DTML Document) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -282,7 +288,7 @@ class Dumper( SimpleItem ):
         self._writeProperties( obj, file )
         file.close()
 
-    security.declarePrivate( '_dumpExternalMethod' )
+    @security.private
     def _dumpExternalMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file.
@@ -298,7 +304,7 @@ class Dumper( SimpleItem ):
             file.write( 'function:string=%s\n' % obj._function )
         file.close()
 
-    security.declarePrivate( '_dumpFileOrImage' )
+    @security.private
     def _dumpFileOrImage( self, obj, path=None ):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -322,7 +328,7 @@ class Dumper( SimpleItem ):
                 data = data.next
         file.close()
 
-    security.declarePrivate( '_dumpPythonMethod' )
+    @security.private
     def _dumpPythonMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Python Method) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -342,7 +348,7 @@ class Dumper( SimpleItem ):
             file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpPythonScript' )
+    @security.private
     def _dumpPythonScript( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Python Script) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -357,7 +363,7 @@ class Dumper( SimpleItem ):
             file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpControllerPythonScript' )
+    @security.private
     def _dumpControllerPythonScript( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Python Script) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -368,7 +374,7 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpValidatorScript' )
+    @security.private
     def _dumpValidatorScript( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Controller Validator) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -379,7 +385,7 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpControllerPageTemplate' )
+    @security.private
     def _dumpControllerPageTemplate( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZopeControllerPageTemplate) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -390,7 +396,7 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpPageTemplate' )
+    @security.private
     def _dumpPageTemplate( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZopePageTemplate) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -405,7 +411,7 @@ class Dumper( SimpleItem ):
             file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
-    security.declarePrivate( '_dumpSQLMethod' )
+    @security.private
     def _dumpSQLMethod( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a SQL Method) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -427,7 +433,7 @@ class Dumper( SimpleItem ):
         file.write( text )
         file.close()
 
-    security.declarePrivate( '_dumpZCatalog' )
+    @security.private
     def _dumpZCatalog( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZCatalog) to the
         #   filesystem as a file, with the accompanyting properties file.
@@ -449,7 +455,7 @@ class Dumper( SimpleItem ):
             file.write( '%s\n' % column )
         file.close()
     
-    security.declarePrivate( '_dumpZClass' )
+    @security.private
     def _dumpZClass( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZClass) to the
         #   filesystem as a directory, including propertysheets and
@@ -504,7 +510,7 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
     
-    security.declarePrivate( '_dumpZClassPropertySheet' )
+    @security.private
     def _dumpZClassPropertySheet( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a ZClass) to the
         #   filesystem as a directory, including propertysheets and
@@ -517,7 +523,7 @@ class Dumper( SimpleItem ):
         file.write( 'title:string=%s\n' % obj.title )
         file.close()
     
-    security.declarePrivate( '_dumpPermission' )
+    @security.private
     def _dumpPermission( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Zope Permission) to the
         #   filesystem as a .properties file.
@@ -526,7 +532,7 @@ class Dumper( SimpleItem ):
         file.write( 'name:string=%s\n' % obj.name )
         file.close()
 
-    security.declarePrivate( '_dumpFactory' )
+    @security.private
     def _dumpFactory( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Zope Factory) to the
         #   filesystem as a .properties file.
@@ -537,7 +543,7 @@ class Dumper( SimpleItem ):
         file.write( 'permission:string=%s\n' % obj.permission )
         file.close()
 
-    security.declarePrivate( '_dumpWizard' )
+    @security.private
     def _dumpWizard( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a Wizard) to the
         #   filesystem as a directory, containing a .properties file
@@ -562,7 +568,7 @@ class Dumper( SimpleItem ):
             file.write( '%s:%s\n' % ( id, meta ) )
         file.close()
 
-    security.declarePrivate( '_dumpWizardPage' )
+    @security.private
     def _dumpWizardPage( self, obj, path=None ):
         #   Dump properties of obj (assumed to be a WizardPage) to the
         #   filesystem as a file, appending ".wizardpage" to the name.
@@ -571,7 +577,7 @@ class Dumper( SimpleItem ):
         self._writeProperties( obj, file )
         file.close()
 
-    security.declarePrivate( '_dumpFormulatorForm' )
+    @security.private
     def _dumpFormulatorForm( self, obj, path=None ):
         if path is None:
             path = ''
@@ -606,7 +612,7 @@ class Dumper( SimpleItem ):
                 , 'ZWiki Page'      : _dumpZWikiPage
                 }
 
-    security.declareProtected( USE_DUMPER_PERMISSION, 'testDump' )
+    @security.protected(USE_DUMPER_PERMISSION)
     def testDump( self, peer_path, path=None, REQUEST=None ):
         """
             Test dumping a single item.
@@ -620,5 +626,5 @@ class Dumper( SimpleItem ):
                                         % peer_path
                                         )
 
-InitializeClass( Dumper )
+InitializeClass(Dumper)
 
