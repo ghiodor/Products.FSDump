@@ -14,12 +14,12 @@ from ZODB.POSException import ConflictError
 
 _wwwdir = os.path.join( package_home( globals() ), 'www' )
 
-manage_addDumperForm = PageTemplateFile('www/addDumper', globals() )
+addDumperForm = PageTemplateFile('www/addDumper', globals() )
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
 
-def manage_addDumper(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
+def addDumper(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
     """Add a Dumper object to the system
     """
     dumper = Dumper()

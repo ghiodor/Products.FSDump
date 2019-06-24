@@ -1,6 +1,6 @@
 """ FSDump plugin interface:  MetatypeDumper
 
-$Id$
+$Id: MetatypeDumper.py 97084 2005-04-29 14:19:31Z tseaver $
 """
 
 try:

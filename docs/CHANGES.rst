@@ -1,11 +1,6 @@
 FSDump Changelog
 ================
 
-0.10 (unreleased)
------------------
-
-- Add support for dumping ``BTreeFolder2`` as a directory.
-
 0.9.5 (2009-11-03)
 ------------------
 

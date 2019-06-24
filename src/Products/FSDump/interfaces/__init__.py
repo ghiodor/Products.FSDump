@@ -1,4 +1,0 @@
-""" FSDump product interfaces.
-
-$Id$
-"""

@@ -1,0 +1,523 @@
+Metadata-Version: 1.0
+Name: Products.FSDump
+Version: 0.9.5
+Summary: Dump through-the-web Zope objects to the filesystem
+Home-page: http://pypi.python.org/pypi/Products.FSDump
+Author: Tres Seaver
+Author-email: tseaver@agendaless.com
+License: ZPL 2.1 (http://www.zope.org/Resources/License/ZPL-2.1)
+Description: FSDump Product Overview
+        =======================
+        
+        FSDump grew out of an itch which many Zope developers have:
+        through-the-web development is faster and easier to do, but
+        causes significant deployment and configuration management
+        problems.  Through-the-web code cannot (easily) be checked into
+        CVS, or diffed to show changes, or grepped to find the source
+        of an error message.
+        
+        Goals
+        -----
+        
+        - The first goal is to ease the burden of getting TTW code
+        under version control:  i.e., to make it possible to check
+        a representation of the TTW code into CVS, and then to see
+        what changes between versions.
+        
+        - Keep the file-system representations of the TTW objects
+        simple and "natural" (we are explicitly avoiding XML here).
+        
+        - Future goals might include:
+        
+        o Two-way migration (e.g., make changes to dumped items in
+        vim/emacs, and then import those changes back into the
+        TTW code).
+        
+        Installation
+        ------------
+        
+        See the separate `installation directions <INSTALL.html>`_.
+        
+        
+        Usage
+        -----
+        
+        - Use the "Add list" to create a "Dumper" instance in a folder
+        (or Product) which contains the TTW code to be dumped.
+        
+        - Supply an absolute path to a directory on the filesystem
+        in which the dumper is to create the files (note that the
+        user as whom Zope is running needs write access to this
+        directory).  See the `form help <Dumper_editForm.html>`_.
+        
+        - Click the "Change and Dump" button to do the dump to the
+        indicated directory.
+        
+        
+        Mapping TTW Code to the Filesystem
+        ----------------------------------
+        
+        See the `mappings documentation <Mappings.html>`_.
+        
+        
+        Known Issues
+        ------------
+        
+        - Some types of metadata (``bobobase_modification_time``) won't
+        be exported as a property.
+        
+        - See the `TODO list <TODO.html>`_.
+        
+        ------------------------------------------------------------
+        
+        Edit / Dump Dumper
+        ==================
+        
+        Description
+        -----------
+        
+        The "Edit / Dump" view of an Dumper instance is used to set the
+        filesystem path to which the object's parent will be dumped, and
+        to initiate this dumping.
+        how the operations
+        
+        Controls
+        --------
+        
+        ``ID``
+        The id of the Dumper object (readonly)
+        
+        ``Filesystem path``
+        The path under which the Dumper's parent will have its filesystem
+        analog (a subdirectory) created.  All children of the Dumper's
+        parent will have their analogs created under this subdirectory.
+        E.g., if the value of this field is ``/tmp``, and the parent folder
+        is called ``parent_folder``, then the dumper will create a
+        subdirectory, ``/tmp/parent_folder``, and build objects in it
+        corresponding to the dumper's "siblings".
+        
+        ``Use .metadata file``
+        If checked, write a "new-style" .metadata file, in a format
+        compatilbie with CMF 1.4 and later.  Properties go into the
+        ``[Default]`` section.
+        
+        ``Change``
+        Changes the filesystem mapping.
+        
+        ``Change and Dump``
+        Changes the filesystem mapping and performs the dumping.
+        
+        ------------------------------------------------------------
+        
+        Mapping TTW Code to the Filesystem
+        ==================================
+        
+        General Mapping
+        ---------------
+        
+        - Create the most "natural" filesystem analogue for each TTW
+        item:  Folders -> directories, DTML Methods/Documents ->
+        DTML files, PythonMethods -> Python modules.
+        
+        - Trap non-inline properties in a companion file, with a
+        ``.properties`` suffix.  Store one property per line, using
+        ``name:type=value`` syntax.
+        
+        * XXX: in companion ``.metadata`` file, store the properties
+        in the ``[Default]`` section.
+        
+        - Map the permission-role map in the ``[Permissions]`` section of the
+        companion ``.metadata`` file (XXX this feature not present before
+        the switch to ``.metadata``, although it might have mapped to the
+        ``.security`` file supported by CMF 1.3)
+        
+        - Map local roles in the ``[LocalRoles]`` section of the
+        companion ``.metadata`` file (XXX this feature not present before
+        the switch to ``.metadata``)
+        
+        - Write proxy roles to a ``proxy`` property (XXX CMF 1.4 compatibility;
+        this is an *ugly* spelling).  Should probably put it into a "prettier"
+        spelling, as well, and lobby to change the spelling used in CMF.
+        
+        - Preserve enough metadata to be able to recreate the TTW
+        object, preferably by *using its web interface.*  This rule
+        is the chief differentiator (in concept) from pickling; we
+        don't save state which cannot be set by a TTW manager.
+        
+        Specific Mappings
+        -----------------
+        
+        Folder
+        %%%%%%
+        
+        - Recursively store contained items into the folder's directory.
+        
+        - Store a list of the dumped items in an ``.objects`` file,
+        one line per item, using the format, ``name:meta_type``.
+        
+        * XXX: in ``.metadata`` file, store the same lines in an
+        ``[Objects]`` directory.
+        
+        File / Image
+        %%%%%%%%%%%%
+        
+        - Save the file contents themselves in binary format using the item's id.
+        
+        - Store properties in ``*.properties``.
+        
+        DTMLMethod
+        %%%%%%%%%%
+        
+        - Create a single file containng the text of the template.  Filename will
+        have extension, ``.dtml``.
+        
+        DTMLDocument
+        %%%%%%%%%%%%
+        
+        - Create a single file containng the text of the template.  Filename will
+        have extension, ``.dtml``.
+        
+        - Store properties in ``*.properties``.
+        
+        Python Script
+        %%%%%%%%%%%%%
+        
+        - Create a module containing a single top-level function definition, using
+        the "read" format (bindings in comments at the top).
+        
+        PageTemplate
+        %%%%%%%%%%%%
+        
+        - Create a single file containng the text of the template.  Filename will
+        have extension, ``.pt``.
+        
+        - Store properties in ``*.properties``.
+        
+        SQL Method
+        %%%%%%%%%%
+        
+        - Inject the parameter list inline into the body, with a leading blank line.
+        
+        ZCatalog
+        %%%%%%%%
+        
+        - Store the paths of the catalogued objects in a ``<id>.catalog`` file,
+        one line per item.
+        
+        - Store the index definititions in a ``<id>.indexes`` file,
+        one line per index, using the format, ``name:meta_type``.
+        
+        - Store the schema in a ``<id>.metadata`` file, one line per
+        field name.
+        
+        Controller Python Script
+        %%%%%%%%%%%%%%%%%%%%%%%%
+        
+        - Create a module containing a single top-level function
+        definition, using the "read" format (bindings in comments
+        at the top).  Filename will have extension, ``.cpy``
+        
+        - Store properties in ``*.properties``.
+        
+        Controller Validator
+        %%%%%%%%%%%%%%%%%%%%
+        
+        - Create a module containing a single top-level function
+        definition, using the "read" format (bindings in comments
+        at the top).  Filename will have extension, ``.vpy``
+        
+        - Store properties in ``*.properties``.
+        
+        Controller Page Template
+        %%%%%%%%%%%%%%%%%%%%%%%%
+        
+        - Create a single file containng the text of the template.
+        Filename will have extension, ``.cpt``.
+        
+        - Store properties in ``*.properties``.
+        
+        
+        Mappings for Obsolete Types
+        ---------------------------
+        
+        Python Method
+        %%%%%%%%%%%%%
+        
+        - Create a module containing a single top-level function
+        definition, using the name, argument list, and body.
+        
+        ZClass
+        %%%%%%
+        
+        - Map to a directory.
+        
+        - Store "basic" tab values in ``.properties``
+        
+        - Store icon in ``.icon``
+        
+        - Store propertysheets in ``propertysheets/common``.
+        
+        - Store method tab objects (including nested ZClasses)
+        in ``propertysheets/methods``.
+        
+        Common Instance Property Sheet (ZClass property sheet)
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        - Store properties as ``name:type=value`` in file of same name.
+        
+        Zope Permission
+        %%%%%%%%%%%%%%%
+        
+        - Store values in ``*.properties``.
+        
+        Zope Factory
+        %%%%%%%%%%%%
+        
+        - Store values in ``*.properties``.
+        
+        Wizard
+        %%%%%%
+        
+        - Map to a directory.
+        
+        - Store properties in ``.properties``.
+        
+        - Store pages.
+        
+        WizardPage
+        %%%%%%%%%%
+        
+        - Store text in ``*.wizardpage``.
+        
+        - Store properties in ``*.properties``.
+        
+        ------------------------------------------------------------
+        
+        FSDump Changelog
+        ================
+        
+        0.9.5 (2009-11-03)
+        ------------------
+        
+        - Removed broken HelpSys registrations.
+        
+        - Fixed the version number used in making the sdist.
+        
+        
+        0.9.4 (2009-02-22)
+        ------------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/0.9.4
+        
+        - Repackaged as a Python egg.
+        
+        - Converted docs to ReStructured text.
+        
+        - Moved from CVS to SVN.
+        
+        
+        0.9.3 (2006-12-20)
+        ------------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9_3
+        
+        - Applied patch from Damine Baty, fixing the output of dumping ZSQLMethods
+        to match the format used by CMF's FSZSQLMethods.
+        
+        - Applied patch from Alejo Roda, adding a handler for Formulator forms.
+        
+        - Applied patch from Willi Langenburger, adding a handler for ZWikiPage
+        objects.
+        
+        
+        0.9.2 (2005-08-09)
+        -------------------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9_2
+        
+        - CVS tag:  ``FSDump-0_9_2``
+        
+        - Reverted ``handler_overrides`` brownbag
+        
+        
+        0.9.1 (2005-08-09)
+        ------------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9_1
+        
+        - CVS tag:  ``FSDump-0_9_1``
+        
+        - Added argument to Dumper factory to allow caller to supply handler
+        overrides.
+        
+        - Applied patch from Sam Brauer, addressing the following issues:
+        
+        * Proxy roles and security settings weren't being written to
+        the ``.metadata`` file.
+        
+        * The ``[Default]`` section should be named ``[default]``.
+        
+        * The property-type extensions confuse CMF's FilesystemDirectoryView
+        (the patch removes the ``:string`` for string properties;  others
+        are likely still broken).
+        
+        
+        0.9 (2005-04-29)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_9
+        
+        - CVS tag:  ``FSDump-0_9``
+        
+        - Merged Andy Fundinger's work, adding handlers for the following
+        CMFFormController meta_types:
+        
+        * ControllerPythonScript
+        
+        * ControllerValidator
+        
+        * ControllerPageTemplates
+        
+        - Fix missing import of ConflictError (thanks to Willi Langenburger
+        for the patch).
+        
+        - Applied a patch from Willi Langenburger to permit use of a dumper
+        in the root of the Zope instance.
+        
+        
+        0.8.1 (2004-12-09)
+        ------------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_8_1
+        
+        - CVS tag:  ``FSDump-0_8_1``
+        
+        - Repackaged to nest the actual products directory inside a version-
+        qualified wrapper directory;  added an INSTALL.txt in the wrapper.
+        
+        
+        0.8 (2004-10-13)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_8
+        
+        - CVS tag:  ``FSDump-0_8``
+        
+        - Applied patch from Zope collector #1463 to make dumped SQL methods
+        fit better with CMF's FSSQLMethod representation.
+        
+        
+        0.7 (2004-05-17)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_7
+        
+        - CVS tag:  ``FSDump-0_7``
+        
+        - Added knob to force use of single ``.metadata`` file, rather than
+        multiples (CMF 1.4 compatibility).
+        
+        - Migrated ZMI to use PageTemplates.
+        
+        - Bug:  when synthesizing a file extension, Dumper didn't include the
+        synthesized extension in the name of the "companion" properties file.
+        
+        
+        0.6 (2001-08-09)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_6
+        
+        - CVS tag:  ``FSDump-0_6``
+        
+        - Add handlers for:
+        
+        - PageTemplate
+        
+        
+        0.5 (2001-08-03)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_5
+        
+        - CVS tag:  ``FSDump-0_5``
+        
+        - Add handlers for:
+        
+        - PythonScript
+        
+        
+        0.4 (2001-06-18)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_4
+        
+        - CVS tag:  ``FSDump-0_4``
+        
+        - Conform to the "Finished Project Guidelines",
+        http://dev.zope.org/Wikis/DevSite/Proposals/FinishedProductGuidelines
+        
+        - Added HelpSystem stuff.
+        
+        - Moved to use declarative security.
+        
+        
+        0.3 (2001-01-06)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_3
+        
+        - No CVS tag?
+        
+        - Dump ZClass icon.
+        
+        - Add handlers for:
+        
+        * Wizards
+        
+        * Wizard Pages
+        
+        
+        0.2 (2000-11-19)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_2
+        
+        - CVS tag:  ``FSDump-0_2``
+        
+        - Add handlers for:
+        
+        * ZClasses
+        
+        * ZClass property sheets
+        
+        * TTW Permissions
+        
+        * TTW Factories
+        
+        
+        - Fix unixism in ``Dumper._setFSPath()`` -- thanks Craig! (cba@mediaone.net)
+        
+        0.1 (2000-11-16)
+        ----------------
+        
+        - SVN:  http://svn.zope.org/Products.FSDump/tags/FSDump-0_1
+        
+        - CVS tag:  ``FSDump-0_1``
+        
+        - Initial release
+        
+        ------------------------------------------------------------
+        
+        Download
+        ========
+Keywords: web application server zope zope2
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Framework :: Plone
+Classifier: Framework :: Zope2
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Libraries :: Application Frameworks
