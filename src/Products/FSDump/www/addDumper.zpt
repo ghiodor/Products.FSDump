@@ -4,7 +4,7 @@
 
 <main class="container-fluid">
 
-<form action="addDumper" method="post">
+<form action="manage_addFSDump" method="post">
 <table>
 
  <tr valign="top">

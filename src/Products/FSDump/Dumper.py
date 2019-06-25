@@ -6,7 +6,7 @@ $Id$
 import os
 
 from AccessControl.class_init import InitializeClass
-from AccessControl.Permissions import ClassSecurityInfo
+from AccessControl.SecurityInfo import ClassSecurityInfo
 from App.Common import package_home
 from OFS.SimpleItem import SimpleItem
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
@@ -14,12 +14,12 @@ from ZODB.POSException import ConflictError
 
 _wwwdir = os.path.join( package_home( globals() ), 'www' )
 
-addDumperForm = PageTemplateFile('www/addDumper', globals() )
+manage_addFSDumpForm = PageTemplateFile('www/addDumper', globals() )
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
 
-def addDumper(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
+def manage_addFSDump(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
     """Add a Dumper object to the system
     """
     dumper = Dumper()
