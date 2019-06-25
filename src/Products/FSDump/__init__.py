@@ -2,7 +2,7 @@
 
 $Id: __init__.py 105463 2009-11-03 14:52:27Z tseaver $
 """
-from Products.FSDumper import Dumper
+from Products.FSDumper.Dumper import Dumper, addDumperForm, addDumper
 
 def initialize( context ):
 
