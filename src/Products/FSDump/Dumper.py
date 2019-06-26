@@ -82,7 +82,7 @@ class Dumper(SimpleItem):
             Iterate recursively over our peers, creating simulacra
             of them on the filesystem in 'fspath'
         """
-        if REQUEST and REQUEST.form.has_key('fspath'):
+        if REQUEST and 'fspath' in REQUEST.form:
             self._setFSPath(REQUEST.form['fspath'])
 
         parent = self.aq_parent.aq_base
@@ -146,9 +146,9 @@ class Dumper(SimpleItem):
                                 , filename, extension )
         file = open( fullpath, mode )
         if self.use_metadata_file:
-            print >> file, "[default]"
+            file.write("[default]\n")
         else:
-            print >> file, "[Default]"
+            file.write("[Default]\n")
         return file
     
     @security.private
@@ -210,7 +210,7 @@ class Dumper(SimpleItem):
         dumped.sort() # help diff out :)
 
         if self.use_metadata_file:
-            print >> file, "\n[Objects]"
+            file.write("\n[Objects]\n")
         else:
             file.close()
             file = self._createFile( path, '.objects' )
