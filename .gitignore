@@ -11,4 +11,5 @@ lib
 lib64
 *.pyo
 *.pyc
+*.swp
 .installed.cfg

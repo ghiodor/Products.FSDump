@@ -10,9 +10,10 @@ from AccessControl.class_init import InitializeClass
 from AccessControl.SecurityInfo import ClassSecurityInfo
 from OFS.SimpleItem import SimpleItem
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
-from Products.PageTemplates.ZopePageTemplate import ZopePageTemplate
 from ZODB.POSException import ConflictError
 
+from Products.PageTemplates.ZopePageTemplate import ZopePageTemplate
+from Products.ZSQLMethods.SQL import SQL
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
@@ -715,14 +716,16 @@ class Dumper(SimpleItem):
 
 
     @security.private
-    def _readProperties(self, obj, propsfile):
-        props = {}
+    def _loadProperties(self, obj, propsfile):
         for line in propsfile:
             if line == '\n': break
             print(line)
             propid, value = line[:-1].split('=')
-            props[propid] = value
-        return props
+            try:
+                obj._updateProperty(propid, value)
+            except:
+                print(sys.exc_info()[0])
+            # TODO: needs type, default is string
 
 
     #
@@ -742,12 +745,7 @@ class Dumper(SimpleItem):
             path = ''
         path = os.path.join(path, folder.id)
         propsfile = self._openMetadataFile(path, '')
-        props = self._readProperties(folder, propsfile)
-            #try:
-            #    obj._updateProperty(propid, value)
-            #except:
-            #    print(sys.exc_info()[0])
-            # TODO: needs type, default is string
+        self._loadProperties(folder, propsfile)
         if self.use_metadata_file:
             propsfile.readline() # skip header "[Objects]"
         else:
@@ -769,36 +767,40 @@ class Dumper(SimpleItem):
         #   Load a ZopePageTemplate from the filesystem,
         #   with the accompanying properties file.
         fullpath = "%s/%s.pt" % (self._buildPathString(path), fname)
-        with open(fullpath, mode='r') as zptfile:
-            txt = zptfile.read()
-            zpt = ZopePageTemplate(fname, txt)
+        objfile = open(fullpath, mode='r')
+        txt = objfile.read()
+        objfile.close()
+        obj = ZopePageTemplate(fname, txt)
         propsfile = self._openMetadataFile(path, fname + ".pt")
-        self._loadProperties(zpt, propsfile)
+        self._loadProperties(obj, propsfile)
         propsfile.close()
-        folder._setObject(fname, zpt, set_owner=0)
+        folder._setObject(fname, obj, set_owner=0)
 
 
     @security.private
-    def _loadSQLMethod(self, obj, path=None):
-        #   Dump properties of obj (assumed to be a SQL Method) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.zsql' % obj.id )
-        text = "%s" % obj.src
-        file.write(' <dtml-comment>\n')
-        file.write( 'title:%s\n' % obj.title )
-        file.write( 'arguments: %s\n'
-                     % ' '.join(obj.arguments_src.splitlines() ) )
-        file.write( 'connection_id:%s\n' % obj.connection_id )
-        file.write( 'max_rows:%s\n' % obj.max_rows_ )
-        file.write( 'max_cache:%s\n' % obj.max_cache_ )
-        file.write( 'cache_time:%s\n' % obj.cache_time_ )
-        file.write( 'class_name:%s\n' % obj.class_name_ )
-        file.write( 'class_file:%s\n' % obj.class_file_ )
-        file.write( '</dtml-comment>\n')
-        if text[-1] != '\n':
-            text = '%s\n' % text
-        file.write( text )
-        file.close()
+    def _loadSQLMethod(self, folder, fname, path=None):
+        #  Load attributes of a SQL Method from the filesystem
+        #  ZSQL do not use properties, therefore the object's attributes
+        #  are store together with the SQL statement in a <dtml-comment>
+        fullpath = "%s/%s.zsql" % (self._buildPathString(path), fname)
+        objfile = open(fullpath, mode='r')
+        objfile.readline() # skip <dtml-comment>\n
+        attrs = {}
+        for i in range(8):
+            line = objfile.readline()
+            propid, value = line[:-1].split(':')
+            attrs[propid] = value
+        objfile.readline() # skip </dtml-comment>\n
+        text = objfile.read()
+        obj = SQL(fname, attrs['title'], attrs['connection_id',
+                  attrs['arguments', text)
+        #file.write( 'max_rows:%s\n' % obj.max_rows_ )
+        #file.write( 'max_cache:%s\n' % obj.max_cache_ )
+        #file.write( 'cache_time:%s\n' % obj.cache_time_ )
+        #file.write( 'class_name:%s\n' % obj.class_name_ )
+        #file.write( 'class_file:%s\n' % obj.class_file_ )
+        objfile.close()
+        folder._setObject(fname, obj, set_owner=0)
 
 
     @security.private
