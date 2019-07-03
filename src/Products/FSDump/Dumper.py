@@ -266,6 +266,7 @@ class Dumper(SimpleItem):
     def _dumpSecurityInfo(self, obj, file):
         if getattr(obj.aq_base, '_proxy_roles', None):
             file.write('proxy=%s\n' % ','.join(obj._proxy_roles))
+            print('wrote proxy for %s' % obj.id)
         security_header_written = 0
         valid_roles = obj.valid_roles()
         for perm_dict in obj.permission_settings():
@@ -280,6 +281,7 @@ class Dumper(SimpleItem):
                     security_header_written = 1
                     file.write('\n[security]\n')
                 file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
+                print('wrote permission for %s' % obj.id)
 
     @security.private
     def _dumpDTMLMethod( self, obj, path=None ):
@@ -435,11 +437,9 @@ class Dumper(SimpleItem):
         file.write( obj.read() )
         file.close()
         file = self._createMetadataFile( path, '%s.pt' % obj.id )
+        self._writeProperties( obj, file )
         if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
             self._dumpSecurityInfo(obj, file)
-        else:
-            file.write( 'title:string=%s\n' % obj.title )
         file.close()
 
     @security.private
@@ -715,16 +715,14 @@ class Dumper(SimpleItem):
 
 
     @security.private
-    def _loadProperties(self, obj, propsfile):
+    def _readProperties(self, obj, propsfile):
+        props = {}
         for line in propsfile:
             if line == '\n': break
             print(line)
             propid, value = line[:-1].split('=')
-            try:
-                obj._updateProperty(propid, value)
-            except:
-                print(sys.exc_info()[0])
-            # TODO: needs type, default is string
+            props[propid] = value
+        return props
 
 
     #
@@ -744,7 +742,12 @@ class Dumper(SimpleItem):
             path = ''
         path = os.path.join(path, folder.id)
         propsfile = self._openMetadataFile(path, '')
-        self._loadProperties(folder, propsfile)
+        props = self._readProperties(folder, propsfile)
+            #try:
+            #    obj._updateProperty(propid, value)
+            #except:
+            #    print(sys.exc_info()[0])
+            # TODO: needs type, default is string
         if self.use_metadata_file:
             propsfile.readline() # skip header "[Objects]"
         else:
