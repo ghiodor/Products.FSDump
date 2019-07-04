@@ -792,8 +792,8 @@ class Dumper(SimpleItem):
             attrs[propid] = value
         objfile.readline() # skip </dtml-comment>\n
         text = objfile.read()
-        obj = SQL(fname, attrs['title'], attrs['connection_id',
-                  attrs['arguments', text)
+        obj = SQL(fname, attrs['title'], attrs['connection_id'],
+                  attrs['arguments'], text)
         #file.write( 'max_rows:%s\n' % obj.max_rows_ )
         #file.write( 'max_cache:%s\n' % obj.max_cache_ )
         #file.write( 'cache_time:%s\n' % obj.cache_time_ )
@@ -862,7 +862,8 @@ class Dumper(SimpleItem):
 
 
     _loaders = { 'Folder'          : _loadFolder,
-                 'Page Template'   : _loadPageTemplate
+                 'Page Template'   : _loadPageTemplate,
+                 'Z SQL Method'    : _loadSQLMethod
                }
 """
     _loaders = { 'DTML Method'     : _loadDTMLMethod
@@ -878,7 +879,6 @@ class Dumper(SimpleItem):
                 , 'Controller Validator' : _loadValidatorScript
                 , 'Controller Page Template' : _loadControllerPageTemplate
                 , 'Page Template'   : _loadPageTemplate
-                , 'Z SQL Method'    : _loadSQLMethod
                 , 'ZCatalog'        : _loadZCatalog
                 , 'Z Class'         : _loadZClass
                 , 'Common Instance Property Sheet'
