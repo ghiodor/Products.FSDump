@@ -13,9 +13,11 @@ from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from ZODB.POSException import ConflictError
 
 # imports required for the loading of objects
+from OFS.Folder import Folder
 from Products.PageTemplates.ZopePageTemplate import ZopePageTemplate
 from Products.ZSQLMethods.SQL import SQL
 from Products.PythonScripts.PythonScript import PythonScript
+from OFS.Image import File, Image
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
@@ -152,7 +154,8 @@ class Dumper(SimpleItem):
             path = self.fspath
         else:
             path = os.path.normpath(os.path.join(self.fspath, path))
-        
+        if os.path.isdir(path): # add a separator at the end for folders
+            path = os.path.join(path, '')
         return path
 
 
@@ -171,6 +174,7 @@ class Dumper(SimpleItem):
         fullpath = "%s/%s" % (self._checkFSPath(path), filename)
         return open(fullpath, mode)
 
+
     @security.private
     def _createMetadataFile(self, path, filename, mode='w'):
         #   Create/replace file;  return the file object.
@@ -183,11 +187,13 @@ class Dumper(SimpleItem):
         else:
             file.write("[Default]\n")
         return file
+
     
     @security.private
     def _dumpObject(self, object, path=None):
         #   Dump one item, using path as prefix.
         try:
+            print(object.meta_type)
             handler = self._handlers.get(object.meta_type, None)
             if handler is not None:
                 handler(self, object, path)
@@ -205,9 +211,9 @@ class Dumper(SimpleItem):
         dumped = []
         for object in objects:
             if self._dumpObject(object, path) > 0:
-                id = object.id
-                if callable(id):
-                    id = id()
+                id = object.getId()
+                #if callable(id):
+                #    id = id()
                 dumped.append((id, object.meta_type))
         return dumped
 
@@ -337,29 +343,34 @@ class Dumper(SimpleItem):
             file.write( 'function:string=%s\n' % obj._function )
         file.close()
 
+
     @security.private
-    def _dumpFileOrImage( self, obj, path=None ):
+    def _dumpFileOrImage(self, obj, path=None):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, with the accompanying properties file.
-        file = self._createMetadataFile( path, '%s' % obj.id() )
+        print('dump file', obj.getId())
+        file = self._createMetadataFile(path, '%s' % obj.getId())
         if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            file.write( 'content_type=%s\n' % obj.content_type )
-            file.write( 'precondition=%s\n' % obj.precondition )
+            file.write('title=%s\n' % obj.title)
+            file.write('content_type=%s\n' % obj.content_type)
+            file.write('precondition=%s\n' % obj.precondition)
         else:
-            file.write( 'title:string=%s\n' % obj.title )
-            file.write( 'content_type:string=%s\n' % obj.content_type )
-            file.write( 'precondition:string=%s\n' % obj.precondition )
+            file.write('title:string=%s\n' % obj.title)
+            file.write('content_type:string=%s\n' % obj.content_type)
+            file.write('precondition:string=%s\n' % obj.precondition)
         file.close()
-        file = self._createFile( path, obj.id(), 'wb' )
+        file = self._createFile(path, obj.getId(), 'wb')
         data = obj.data
-        if type( data ) == type( '' ):
-            file.write( data )
-        else:
-            while data is not None:
-                file.write( data.data )
-                data = data.next
+        file.write(data)
+        # TODO: this is not working in Zope4
+        #if type(data) == type(''):
+        #    file.write(data)
+        #else:
+        #    while data is not None:
+        #        file.write(data.data)
+        #        data = data.next
         file.close()
+
 
     @security.private
     def _dumpPythonMethod( self, obj, path=None ):
@@ -682,27 +693,31 @@ class Dumper(SimpleItem):
  
 
     @security.private
-    def _openMetadataFile(self, path, filename):
+    def _openMetadataFile(self, fullpath):
         #   open properties file in path;  return the file object.
-        extension = self.use_metadata_file and 'metadata' or 'properties'
-        fullpath = "%s/%s.%s" % (self._buildPathString(path),
-                                 filename, extension )
-        file = open(fullpath, mode='r')
-        line = file.readline()
+        extension = self.use_metadata_file and '.metadata' or '.properties'
+        metafile = open(fullpath + extension, mode='r')
+        line = metafile.readline()
         # TODO: check contents of first line, per:
         #if self.use_metadata_file:
         #    file.write("[default]\n")
         #else:
         #    file.write("[Default]\n")
-        return file
+        return metafile
     
 
     @security.private
-    def _loadProperties(self, obj, propsfile):
-        for line in propsfile:
+    def _readProperties(self, metafile):
+        # Loading of properties is split in two parts: first read
+        # into a dict then load as properties in _loadProperties
+        # This separation allows some properties which are
+        # actually attributes to be loaded differently
+        props = {}
+        for line in metafile:
             if line == '\n': break
-            print(line)
-            prop, value = line[:-1].split('=')
+            eq = line.find('=')
+            prop = line[:eq]
+            value = line[eq+1:-1]
             tmp = prop.split(':')
             propid = tmp[0]
             if len(tmp) == 2:
@@ -710,18 +725,29 @@ class Dumper(SimpleItem):
             else:
                 otype = 'string'
             if otype == 'ustring': otype = 'string'
-            #try:
+            props[propid] = (value, otype)
+        return props
+
+
+    @security.private
+    def _loadProperties(self, obj, props):
+        # See note for _readProperties. If a property is loaded
+        # separately as an attribute, then it should be removed
+        # from the props dict before calling this function.
+        if not props: return
+        for propid, valtype in props.items():
+            #try: not all objects are PropertyManager
             if obj.hasProperty(propid):
-                obj._updateProperty(propid, value)
+                obj._updateProperty(propid, valtype[0])
             else:
-                obj._setProperty(propid, value, otype)
+                obj._setProperty(propid, valtype[0], valtype[1])
             #except:
             #    print(propid, otype)
             #    print(sys.exc_info()[0])
 
 
     @security.private
-    def _loadFile( self, folder, fname, meta, path=None ):
+    def _loadOneFile(self, folder, fname, meta, path=None):
         #   Load one file system item (file or folder)
         loader = self._loaders.get(meta, None)
         if loader is not None:
@@ -734,7 +760,7 @@ class Dumper(SimpleItem):
         #   Load each file (or folder) from the file system
         for fname, meta in files:
             print('load ', fname, meta)
-            self._loadFile(folder, fname, meta, path)
+            self._loadOneFile(folder, fname, meta, path)
 
 
     #
@@ -747,27 +773,38 @@ class Dumper(SimpleItem):
 
 
     @security.private
-    def _loadFolder(self, folder, path=None):
-        #   Load file .objects
-        #   Recurse to load items from a folder
-        if path is None:
-            path = ''
-        path = os.path.join(path, folder.id)
-        propsfile = self._openMetadataFile(path, '')
-        self._loadProperties(folder, propsfile)
+    def _loadFolder(self, folder, fname='', path=None):
+        #   Recursively load items from a folder.
+        #   path is the file system path corresponding to folder,
+        #   except for the top folder, which should be None and fname==''
+        #   The folder contents are listed in .objects or .metadata[objects]
+        #   Format: objectid:meta_type\n
+        if path is None: 
+            # top folder of fsdump, already exists
+            # joins the path and adds a / at the end
+            path = os.path.join(folder.id, '')
+        else:
+            # joins the path and adds a / at the end
+            path = os.path.join(path, fname, '')
+            obj = Folder(fname)
+            folder._setObject(fname, obj, set_owner=0)
+            folder = folder._getOb(fname)
+        fullpath = self._buildPathString(path)
+        metafile = self._openMetadataFile(fullpath)
+        props = self._readProperties(metafile)
+        self._loadProperties(folder, props)
         if self.use_metadata_file:
-            propsfile.readline() # skip header "[Objects]"
+            metafile.readline() # skip header "[Objects]"
         else:
             # close .metadata file and open .objects file
-            propsfile.close()
-            fullpath = "%s/%s" % (self._buildPathString(path), '.objects')
-            propsfile = open(fullpath, mode='r')
+            metafile.close()
+            metafile = open(fullpath + '/.objects', mode='r')
         files = []
-        for line in propsfile:
-            print(line)
+        for line in metafile:
+            print('Indexed file:', line[:-1])
             propid, meta = line[:-1].split(':')
             files.append((propid, meta))
-        propsfile.close()
+        metafile.close()
         self._loadFiles(folder, files, path)
 
 
@@ -776,12 +813,13 @@ class Dumper(SimpleItem):
         #   Load a ZopePageTemplate from the filesystem,
         #   with the accompanying properties file.
         fullpath = "%s/%s.pt" % (self._buildPathString(path), fname)
-        objfile = open(fullpath, mode='r')
+        objfile = open(fullpath, mode='r', encoding='latin-1')
         txt = objfile.read()
         objfile.close()
         obj = ZopePageTemplate(fname, txt)
-        metafile = self._openMetadataFile(path, fname + ".pt")
-        self._loadProperties(obj, metafile)
+        metafile = self._openMetadataFile(fullpath)
+        props = self._readProperties(metafile)
+        self._loadProperties(obj, props)
         metafile.close()
         folder._setObject(fname, obj, set_owner=0)
 
@@ -797,12 +835,15 @@ class Dumper(SimpleItem):
         attrs = {}
         for i in range(8):
             line = objfile.readline()
-            propid, value = line[:-1].split(':')
+            colon = line.find(':')
+            propid = line[:colon]
+            value = line[colon+1:-1]
             attrs[propid] = value
         objfile.readline() # skip </dtml-comment>\n
         text = objfile.read()
         obj = SQL(fname, attrs['title'], attrs['connection_id'],
                   attrs['arguments'], text)
+        # TODO: advanced props
         #file.write( 'max_rows:%s\n' % obj.max_rows_ )
         #file.write( 'max_cache:%s\n' % obj.max_cache_ )
         #file.write( 'cache_time:%s\n' % obj.cache_time_ )
@@ -817,17 +858,63 @@ class Dumper(SimpleItem):
         #   Load a python script from the file system
         #   and the accompanying properties file.
         fullpath = "%s/%s.py" % (self._buildPathString(path), fname)
-        objfile = open(fullpath, mode='r')
+        objfile = open(fullpath, mode='r', encoding='latin-1')
         text = objfile.read()
         objfile.close()
         obj = PythonScript(fname)
         obj.write(text)
-        metafile = self._openMetadataFile(path, fname + '.py')
+        metafile = self._openMetadataFile(fullpath)
         line = metafile.readline()
-        prop, value = line[:-1].split('=')
+        eq = line.find('=')
+        prop = line[:eq]
+        value = line[eq+1:-1]
         obj.ZPythonScript_setTitle(value)  
         metafile.close()
         folder._setObject(fname, obj, set_owner=0)
+
+
+    @security.private
+    def _loadFile(self, folder, fname, path=None):
+        fullpath = "%s/%s" % (self._buildPathString(path), fname)
+        metafile = self._openMetadataFile(fullpath)
+        props = self._readProperties(metafile)
+        metafile.close()
+        # code adapted from OFS/Image.py - manage_addFile
+        # First, we create the file without data:
+        obj = File(fname, props['title'][0], b'',
+                   props['content_type'][0],
+                   props['precondition'][0])
+        folder._setObject(fname, obj)
+        # Now we "upload" the data.  By doing this in two steps, we
+        # can use a database trick to make the upload more efficient.
+        objfile = open(fullpath, mode='rb')
+        obj.manage_upload(objfile.read())
+        objfile.close()
+        #if content_type:
+        #    obj.content_type = content_type
+        # notify(ObjectCreatedEvent(newFile))
+
+
+    @security.private
+    def _loadImage(self, folder, fname, path=None):
+        fullpath = "%s/%s" % (self._buildPathString(path), fname)
+        metafile = self._openMetadataFile(fullpath)
+        props = self._readProperties(metafile)
+        metafile.close()
+        # code adapted from OFS/Image.py - manage_addFile
+        # First, we create the file without data:
+        obj = Image(fname, props['title'][0], b'',
+                   props['content_type'][0],
+                   props['precondition'][0])
+        folder._setObject(fname, obj)
+        # Now we "upload" the data.  By doing this in two steps, we
+        # can use a database trick to make the upload more efficient.
+        objfile = open(fullpath, mode='rb')
+        obj.manage_upload(objfile.read())
+        objfile.close()
+        #if content_type:
+        #    obj.content_type = content_type
+        # notify(ObjectCreatedEvent(newFile))
 
 
     @security.private
@@ -847,35 +934,12 @@ class Dumper(SimpleItem):
         file.close()
 
 
-    @security.private
-    def _loadFileOrImage(self, folder, fname, path=None):
-        #   Dump properties of obj (assumed to be an Externa Method) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createMetadataFile( path, '%s' % obj.id() )
-        if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            file.write( 'content_type=%s\n' % obj.content_type )
-            file.write( 'precondition=%s\n' % obj.precondition )
-        else:
-            file.write( 'title:string=%s\n' % obj.title )
-            file.write( 'content_type:string=%s\n' % obj.content_type )
-            file.write( 'precondition:string=%s\n' % obj.precondition )
-        file.close()
-        file = self._createFile( path, obj.id(), 'wb' )
-        data = obj.data
-        if type( data ) == type( '' ):
-            file.write( data )
-        else:
-            while data is not None:
-                file.write( data.data )
-                data = data.next
-        file.close()
-
-
     _loaders = { 'Folder'          : _loadFolder,
                  'Page Template'   : _loadPageTemplate,
                  'Z SQL Method'    : _loadSQLMethod,
-                 'Script (Python)' : _loadPythonScript
+                 'Script (Python)' : _loadPythonScript,
+                 'File'            : _loadFile,
+                 'Image'           : _loadImage
                }
 """
     _loaders = { 'DTML Method'     : _loadDTMLMethod
@@ -883,7 +947,6 @@ class Dumper(SimpleItem):
                 , 'Folder'          : _loadFolder
                 , 'BTreeFolder2'    : _loadFolder
                 , 'External Method' : _loadExternalMethod
-                , 'File'            : _loadFileOrImage
                 , 'Image'           : _loadFileOrImage
                 , 'Python Method'   : _loadPythonMethod
                 , 'Controller Python Script' : _loadControllerPythonScript
