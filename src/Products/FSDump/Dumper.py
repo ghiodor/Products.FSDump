@@ -681,10 +681,11 @@ class Dumper(SimpleItem):
             self._setFSPath(REQUEST.form['fspath'])
 
         parent = self.aq_parent.aq_base
+        folder = self.aq_parent
         if getattr(parent, 'isTopLevelPrincipiaApplicationObject', 0):
-            self._loadRoot(self.aq_parent)
+            self._loadFolder(folder, '')
         else:
-            self._loadFolder(self.aq_parent)
+            self._loadFolder(folder, folder.getId())
 
         if REQUEST is not None:
             REQUEST['RESPONSE'].redirect(
@@ -767,27 +768,23 @@ class Dumper(SimpleItem):
     #   Type-specific loaders
     #
 
-    @security.private
-    def _loadRoot(self, obj):
-        self._loadFiles(obj.objectValues())
-
 
     @security.private
     def _loadFolder(self, folder, fname='', path=None):
         #   Recursively load items from a folder.
-        #   path is the file system path corresponding to folder,
+        #   path is the relative file system path corresponding to folder,
         #   except for the top folder, which should be None and fname==''
         #   The folder contents are listed in .objects or .metadata[objects]
         #   Format: objectid:meta_type\n
         if path is None: 
             # top folder of fsdump, already exists
             # joins the path and adds a / at the end
-            path = os.path.join(folder.id, '')
+            path = os.path.join(fname, '')
         else:
             # joins the path and adds a / at the end
             path = os.path.join(path, fname, '')
             obj = Folder(fname)
-            folder._setObject(fname, obj, set_owner=0)
+            folder._setObject(fname, obj)
             folder = folder._getOb(fname)
         fullpath = self._buildPathString(path)
         metafile = self._openMetadataFile(fullpath)
@@ -821,7 +818,7 @@ class Dumper(SimpleItem):
         props = self._readProperties(metafile)
         self._loadProperties(obj, props)
         metafile.close()
-        folder._setObject(fname, obj, set_owner=0)
+        folder._setObject(fname, obj)
 
 
     @security.private
@@ -850,7 +847,7 @@ class Dumper(SimpleItem):
         #file.write( 'class_name:%s\n' % obj.class_name_ )
         #file.write( 'class_file:%s\n' % obj.class_file_ )
         objfile.close()
-        folder._setObject(fname, obj, set_owner=0)
+        folder._setObject(fname, obj)
 
 
     @security.private
@@ -870,7 +867,7 @@ class Dumper(SimpleItem):
         value = line[eq+1:-1]
         obj.ZPythonScript_setTitle(value)  
         metafile.close()
-        folder._setObject(fname, obj, set_owner=0)
+        folder._setObject(fname, obj)
 
 
     @security.private
