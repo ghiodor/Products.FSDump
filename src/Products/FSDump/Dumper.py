@@ -18,6 +18,7 @@ from Products.PageTemplates.ZopePageTemplate import ZopePageTemplate
 from Products.ZSQLMethods.SQL import SQL
 from Products.PythonScripts.PythonScript import PythonScript
 from OFS.Image import File, Image
+from Products.ExternalMethod.ExternalMethod import ExternalMethod
 
 USE_DUMPER_PERMISSION = 'Use Dumper'
 
@@ -193,7 +194,6 @@ class Dumper(SimpleItem):
     def _dumpObject(self, object, path=None):
         #   Dump one item, using path as prefix.
         try:
-            print(object.meta_type)
             handler = self._handlers.get(object.meta_type, None)
             if handler is not None:
                 handler(self, object, path)
@@ -348,7 +348,6 @@ class Dumper(SimpleItem):
     def _dumpFileOrImage(self, obj, path=None):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, with the accompanying properties file.
-        print('dump file', obj.getId())
         file = self._createMetadataFile(path, '%s' % obj.getId())
         if self.use_metadata_file:
             file.write('title=%s\n' % obj.title)
@@ -798,7 +797,6 @@ class Dumper(SimpleItem):
             metafile = open(fullpath + '/.objects', mode='r')
         files = []
         for line in metafile:
-            print('Indexed file:', line[:-1])
             propid, meta = line[:-1].split(':')
             files.append((propid, meta))
         metafile.close()
@@ -838,15 +836,12 @@ class Dumper(SimpleItem):
             attrs[propid] = value
         objfile.readline() # skip </dtml-comment>\n
         text = objfile.read()
+        objfile.close()
         obj = SQL(fname, attrs['title'], attrs['connection_id'],
                   attrs['arguments'], text)
-        # TODO: advanced props
-        #file.write( 'max_rows:%s\n' % obj.max_rows_ )
-        #file.write( 'max_cache:%s\n' % obj.max_cache_ )
-        #file.write( 'cache_time:%s\n' % obj.cache_time_ )
-        #file.write( 'class_name:%s\n' % obj.class_name_ )
-        #file.write( 'class_file:%s\n' % obj.class_file_ )
-        objfile.close()
+        obj.manage_advanced(attrs['max_rows'], attrs['max_cache'],
+                            attrs['cache_time'], attrs['class_name'],
+                            attrs['class_file'])
         folder._setObject(fname, obj)
 
 
@@ -915,20 +910,17 @@ class Dumper(SimpleItem):
 
 
     @security.private
-    def _loadExternalMethod( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be an Externa Method) to the
-        #   filesystem as a file.
-        file = self._createMetadataFile( path, '%s.em' % obj.id )
-        if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            file.write( 'module=%s\n' % obj._module )
-            file.write( 'function=%s\n' % obj._function )
-            self._dumpSecurityInfo(obj, file)
-        else:
-            file.write( 'title:string=%s\n' % obj.title )
-            file.write( 'module:string=%s\n' % obj._module )
-            file.write( 'function:string=%s\n' % obj._function )
-        file.close()
+    def _loadExternalMethod(self, folder, fname, path=None):
+        fullpath = "%s/%s.em" % (self._buildPathString(path), fname)
+        metafile = self._openMetadataFile(fullpath)
+        props = self._readProperties(metafile)
+        # TODO:   self._dumpSecurityInfo(obj, file)
+        metafile.close()
+        obj = ExternalMethod(fname,
+                             props['title'][0],
+                             props['module'][0],
+                             props['function'][0])
+        folder._setObject(fname, obj)
 
 
     _loaders = { 'Folder'          : _loadFolder,
@@ -936,20 +928,17 @@ class Dumper(SimpleItem):
                  'Z SQL Method'    : _loadSQLMethod,
                  'Script (Python)' : _loadPythonScript,
                  'File'            : _loadFile,
-                 'Image'           : _loadImage
+                 'Image'           : _loadImage,
+                 'External Method' : _loadExternalMethod
                }
 """
     _loaders = { 'DTML Method'     : _loadDTMLMethod
                 , 'DTML Document'   : _loadDTMLDocument
-                , 'Folder'          : _loadFolder
                 , 'BTreeFolder2'    : _loadFolder
-                , 'External Method' : _loadExternalMethod
-                , 'Image'           : _loadFileOrImage
                 , 'Python Method'   : _loadPythonMethod
                 , 'Controller Python Script' : _loadControllerPythonScript
                 , 'Controller Validator' : _loadValidatorScript
                 , 'Controller Page Template' : _loadControllerPageTemplate
-                , 'Page Template'   : _loadPageTemplate
                 , 'ZCatalog'        : _loadZCatalog
                 , 'Z Class'         : _loadZClass
                 , 'Common Instance Property Sheet'
