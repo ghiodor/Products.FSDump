@@ -272,7 +272,6 @@ class Dumper(SimpleItem):
     def _dumpSecurityInfo(self, obj, file):
         if getattr(obj.aq_base, '_proxy_roles', None):
             file.write('proxy=%s\n' % ','.join(obj._proxy_roles))
-            print('wrote proxy for %s' % obj.id)
         security_header_written = 0
         valid_roles = obj.valid_roles()
         for perm_dict in obj.permission_settings():
@@ -287,7 +286,6 @@ class Dumper(SimpleItem):
                     security_header_written = 1
                     file.write('\n[security]\n')
                 file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
-                print('wrote permission for %s' % obj.id)
 
     @security.private
     def _dumpDTMLMethod( self, obj, path=None ):
@@ -735,6 +733,9 @@ class Dumper(SimpleItem):
         # separately as an attribute, then it should be removed
         # from the props dict before calling this function.
         if not props: return
+        if 'proxy' in props:
+            proxy = props.pop('proxy')
+            obj.aq_base._proxy_roles = proxy.split(',')
         for propid, valtype in props.items():
             #try: not all objects are PropertyManager
             if obj.hasProperty(propid):
@@ -745,6 +746,27 @@ class Dumper(SimpleItem):
             #    print(propid, otype)
             #    print(sys.exc_info()[0])
 
+
+    @security.private
+    def _loadSecurityInfo(self, obj, metafile):
+        # not yet implemented, need to figure out api to register permissions. 
+        # in AccessControl/rolemanager.py manage_permission
+        # manage_permission(self, permission_to_manage, roles=[], acquire=0)
+        # note that proxy roles are loaded in loadProperties
+        security_header_written = 0
+        valid_roles = obj.valid_roles()
+        for perm_dict in obj.permission_settings():
+            perm_name = perm_dict['name']
+            acquire = (perm_dict['acquire'] and 1) or 0
+            roles = []
+            for role_idx in range(len(valid_roles)):
+                if perm_dict['roles'][role_idx]['checked']:
+                    roles.append(valid_roles[role_idx])
+            if roles or (acquire==0):
+                if not security_header_written:
+                    security_header_written = 1
+                    file.write('\n[security]\n')
+                file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
 
     @security.private
     def _loadOneFile(self, folder, fname, meta, path=None):
@@ -759,7 +781,7 @@ class Dumper(SimpleItem):
     def _loadFiles(self, folder, files, path=None):
         #   Load each file (or folder) from the file system
         for fname, meta in files:
-            print('load ', fname, meta)
+            #print('load ', fname, meta)
             self._loadOneFile(folder, fname, meta, path)
 
 
