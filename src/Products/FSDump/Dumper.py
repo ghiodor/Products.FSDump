@@ -3,40 +3,113 @@
 $Id$
 """
 
-import os
-import sys
+# TODO:
+# separate errors into Dumper.errors
+# - support encoding parameter to load text files
+# - load security data
+# - use manage_add; ask zope people to return object; 
+# - document use of self in manage_add methods
+# - report non-dumped objects due to error (continue dumping)
+# - report which meta types do not have handlers
+# - create a security decorator for Z2
+# - dump should remove files not listed in .objects (option)
+# - load should remove objects not listed in .objects (option)
+# - verify that all types of properties are indeed loaded correctly
+# -- at lease _updated tries to convert from string, not sure about _set, see:
+# -- https://github.com/zopefoundation/Zope/blob/master/src/OFS/PropertyManager.py
 
-from AccessControl.class_init import InitializeClass
-from AccessControl.SecurityInfo import ClassSecurityInfo
+# - on addDump, allow option to do only dump or only load 
+#   this allows explicitly configured one-way syncs to avoid mistakes
+# - add option to specify text file encodings
+# - remove old format for properties (see createMetadataFile)
+# - document .metadata format (check CMF one)
+# - handlers should have a class!
+# - handlers should have an interface supported by the objects themselves?
+
+# CHANGES re fsdump 0.9.5:
+# - supports zope 2 and 4, although loading into Zope 2 might not work if
+#   encodings are changed.
+# - it supports partial dumping/loading only of changed objects/files.
+# - Indistinct handling between root ZODB folder and other folder: fsdump will 
+# dump the objects of the folder that contains the FSDump object, regardless
+# of which folder it is;
+# - "_handlers" dictionary now returns a triple (extension, dumper, loader)
+# - old format for dumping data is not supported (use only .metadata files)
+# - functions would pass around the relative path and compute the full path
+#   as needed (more than once). Now the absolute fis system path is passed
+#   around.
+# - currently loads ZPT using encoding='latin-1', change Z2ENC below for your needs
+
+
+import os
+import shutil
+import sys
+import time
+
+PY3 = sys.version_info[0] == 3
+if PY3:
+    binary_type = bytes
+else:
+    binary_type = str
+
+Z2ENC = 'latin-1' # replace this with the encoding used in your Zope 2 system
+ZOPE = 4
+try:
+    from AccessControl.class_init import InitializeClass
+except ImportError: # Zope2
+    from Globals import InitializeClass
+    ZOPE = 2
+try:
+    from AccessControl.SecurityInfo import ClassSecurityInfo
+except ImportError:  # Zope2
+    from AccessControl import ClassSecurityInfo
+from AccessControl.Permissions import change_proxy_roles
 from OFS.SimpleItem import SimpleItem
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from ZODB.POSException import ConflictError
 
 # imports required for the loading of objects
-from OFS.Folder import Folder
-from Products.PageTemplates.ZopePageTemplate import ZopePageTemplate
-from Products.ZSQLMethods.SQL import SQL
-from Products.PythonScripts.PythonScript import PythonScript
-from OFS.Image import File, Image
-from Products.ExternalMethod.ExternalMethod import ExternalMethod
+from OFS.DTMLMethod import addDTMLMethod
+from OFS.DTMLDocument import addDTMLDocument
+from OFS.Folder import manage_addFolder
+from OFS.Image import manage_addFile, manage_addImage
+from Products.PageTemplates.ZopePageTemplate import manage_addPageTemplate
+from Products.PythonScripts.PythonScript import manage_addPythonScript
+from Products.ExternalMethod.ExternalMethod import manage_addExternalMethod
+from Products.ZSQLMethods.SQL import manage_addZSQLMethod
 
-USE_DUMPER_PERMISSION = 'Use Dumper'
-
-# cannot use a decorator as follows because context (given by zope
-# to initialize) is not available in Dumper.py
-#def zope(zclass, addform, addaction, permission, icon):
-#    InitializeClass(zclass)
-#    context.registerClass(zclass,
+# ==== Using a Zope decorater to register a product
+# It would be nice if a class could be declared with a Zope decorator
+# that registers the class in the Zope environment.
+# However, cannot do as follows because "context" (given by zope
+# to "initialize") is not available in Dumper.py
+# So, the decorator would have to be a zope framework function similar to 
+# "initialize" and "initialize" would not have to be declared and called 
+# in __init__.py
+# def Zope(zclass, addform, addaction, permission, icon):
+#     InitializeClass(zclass)
+#     context.registerClass(zclass,
 #                           constructors= (addform,
 #                                          addaction),
 #                           permission= permission,
 #                           icon=icon
-#    )
+#   )
+# mockup use of a Zope decorator to register a Meta type class
+# permission= 'Add Dumper',
+# icon='www/dumper.gif'
+# @Zope(manage_addFSDumpForm, manage_addFSDump, permission, icon)
 
-manage_addFSDumpForm = PageTemplateFile('www/addDumper', globals() )
+USE_DUMPER_PERMISSION = 'Use Dumper'
+
+if ZOPE == 4:
+    manage_addFSDumpForm = PageTemplateFile('www/addDumper', globals())
+else:
+    manage_addFSDumpForm = PageTemplateFile('www/addDumper-z2', globals())
+
 
 def manage_addFSDump(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
-    """Add a Dumper object to the system
+    """
+       Add a Dumper object to the system
     """
     dumper = Dumper()
     dumper.id = id
@@ -48,31 +121,25 @@ def manage_addFSDump(self, id, fspath=None, use_metadata_file=0, REQUEST=None):
 
 
 def initialize(context):
-    """function expected by zope at package level to register the product
-       (to be imported at package level in __init__.py)
+    """
+       Function expected by zope in module's __init__.py to register a product
        (see Zope/OFS/Application.py)
-       This approach is used, instead of the common practice to define it
-       __init__.py, because it doesn't make sense to separate the definition
-       of the constructors from its use (one time use), thus applying
-       the principle of proximity.
+       Keep initialization knowledge local in Dumper.py
     """
     InitializeClass(Dumper)
     context.registerClass(Dumper,
-                          constructors= (manage_addFSDumpForm,
+                          constructors = (manage_addFSDumpForm,
                                          manage_addFSDump),
-                          permission= 'Add Dumper',
-                          icon='www/dumper.gif'
-    )
+                          permission = 'Add Dumper',
+                          icon = 'www/dumper.gif')
 
-#permission= 'Add Dumper',
-#icon='www/dumper.gif'
-#@zope(manage_addFSDumpForm, manage_addFSDump, permission, icon)
+
 class Dumper(SimpleItem):
     """
     """
     meta_type = 'Dumper'
 
-    manage_options = ( { 'label'    : 'Edit'
+    manage_options = ({ 'label'    : 'Edit'
                        , 'action'   : 'editForm'
                        , 'help'     : ('FSDump' ,'Dumper_editForm.stx')
                        }
@@ -80,12 +147,20 @@ class Dumper(SimpleItem):
                        , 'action'   : 'manage_access'
                        , 'help'     : ('OFSP','Security_Define-Permissions.stx')
                        }
-                     )
+                    )
 
     security = ClassSecurityInfo()
-    
+
     fspath = None
     use_metadata_file = 0
+    dump_all = 0
+    load_all = 0
+    tslastdump = None   # TimeStamp "%Y-%m-%d %H:%M:%S"
+    tslastload = None   # TimeStamp "%Y-%m-%d %H:%M:%S"
+    dumped = []         # files dumped at the last dump
+    loaded = []         # files loaded at the last load
+    dump_conflicts = [] # objects not dumped because older than file
+    load_conflicts = [] # files not loaded because older than object
 
     #
     #   Management interface methods.
@@ -93,185 +168,317 @@ class Dumper(SimpleItem):
     index_html = None
 
     security.declareProtected(USE_DUMPER_PERMISSION, 'editForm')
-    editForm = PageTemplateFile('www/editDumper', globals())
+    if ZOPE == 4:
+        editForm = PageTemplateFile('www/editDumper', globals())
+    else:
+        editForm = PageTemplateFile('www/editDumper-z2', globals())
 
 
-    @security.protected(USE_DUMPER_PERMISSION)
-    def edit(self, fspath, use_metadata_file, REQUEST=None):
+    security.declareProtected(USE_DUMPER_PERMISSION, 'edit')
+#    @security.protected(USE_DUMPER_PERMISSION)
+    def edit(self, fspath, use_metadata_file, dump_all=0, load_all=0, REQUEST=None):
         """
-            Update the path to which we will dump our peers.
+            Update Dumper attributes.
         """
-        self._setFSPath(fspath)
+        #   Canonicalize fspath.
+        self.fspath = os.path.normpath(fspath)
         self.use_metadata_file = use_metadata_file
+        self.dump_all = dump_all # dump only objects newer than its file
+        self.load_all = load_all # load only files newer than its object
+        self._checkInput()
 
         if REQUEST is not None:
             REQUEST['RESPONSE'].redirect(
                   self.absolute_url()
                 + '/editForm'
-                + '?manage_tabs_message=Dumper+updated.'
-                                        )
+                + '?manage_tabs_message=Dumper+updated.')
 
-    @security.protected(USE_DUMPER_PERMISSION)
+
+    security.declareProtected(USE_DUMPER_PERMISSION, 'dumpToFS')
+#    @security.protected(USE_DUMPER_PERMISSION)
     def dumpToFS(self, REQUEST=None):
         """
             Iterate recursively over our peers, creating simulacra
             of them on the filesystem in 'fspath'
         """
         if REQUEST and 'fspath' in REQUEST.form:
-            self._setFSPath(REQUEST.form['fspath'])
-
-        parent = self.aq_parent.aq_base
-        if getattr(parent, 'isTopLevelPrincipiaApplicationObject', 0):
-            self._dumpRoot(self.aq_parent)
+            fspath = REQUEST.form['fspath']
+            use_metadata_file = REQUEST.form.get('use_metadata_file', 0)
+            dump_all = REQUEST.form.get('dump_all', 0)
+            load_all = REQUEST.form.get('load_all', 0)
+            self.edit(fspath, use_metadata_file, dump_all, load_all)
         else:
-            self._dumpFolder(self.aq_parent)
+            # make final validation tests in case of direct call
+            self._checkInput()
+
+        fspath = os.path.join(self.fspath, '')
+        folder = self.aq_parent
+        fspath = os.path.join(self.fspath, '') # adds separator
+        self.dumped = []
+        self.dump_conflicts = []
+        self._dumpFolder(folder, fspath)
+        self.tslastdump = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
         if REQUEST is not None:
             REQUEST['RESPONSE'].redirect(
                   self.absolute_url()
                 + '/editForm'
                 + '?manage_tabs_message=Peers+dumped.'
-                                        )
- 
+                                       )
+
     #
-    #   Utility methods
+    #   Methods for object tree browsing
     #
-    @security.private
-    def _setFSPath(self, fspath):
-        #   Canonicalize fspath.
-        fspath = os.path.normpath(fspath)
-        if not os.path.isabs(fspath):
-            raise RunTimeError('Dumper Error: path must be absolute.')
-        self.fspath = fspath
 
-
-    @security.private
-    def _buildPathString(self, path=None):
-        #   Construct a path string, relative to self.fspath.
-        if self.fspath is None:
-            raise RunTimeError('Dumper Error: Path not set.')
-
-        if path is None:
-            path = self.fspath
+    security.declarePrivate('_dumpFolder')
+#    @security.private
+    def _dumpFolder(self, folder, fspath):
+        """
+           Recurse to dump items from a folder into a file system folder path.
+           fspath must be an absolute path ending with a folder separator.
+           It will also delete files/folders in the file system which no longer
+           exist in the database. It does that by loading the current metadata
+           file (if it exists) to compare with the list of dumped objects
+        """
+        objs = {}
+        if os.path.exists(fspath):
+            # load folder object list
+            metafile = None
+            if self.use_metadata_file:
+                if os.path.exists(fspath + '.metadata'):
+                    metafile = self._openMetadataFile(fspath)
+                    # skip properties
+                    props = self._readProperties(metafile)
+                    # skip header "[Objects]"
+                    try: # PY3
+                        line = next(metafile)
+                    except: #  py < 2.6
+                        line = metafile.next()
+                    # remember: readline() not compatible with line iterator
+            elif os.path.exists(fspath + 'objects'):
+                metafile = open(fspath + '.objects')
+            # read list of file system objects into a dict objid -> meta
+            # objects dumped will be removed from the dict and the remaining
+            # objects will then be removed from the file system
+            if metafile:
+                for line in metafile:
+                    objid, meta = line[:-1].split(':')
+                    objs[objid] = meta
+                metafile.close()
+            if self.dump_all: self.dumped.append(fspath)
         else:
-            path = os.path.normpath(os.path.join(self.fspath, path))
-        if os.path.isdir(path): # add a separator at the end for folders
-            path = os.path.join(path, '')
-        return path
+            os.makedirs(fspath)
+            self.dumped.append(fspath)
 
 
-    @security.private
-    def _checkFSPath(self, path=None):
-        #   Ensure that fspath/path exists.
-        path = self._buildPathString(path)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        return path
+        # dump objects of the folder; "dumped" includes all existing objects
+        dumped = self._dumpObjects(folder, folder.objectValues(), fspath)
+        dumped.sort() # help diff out :)
 
-
-    @security.private
-    def _createFile(self, path, filename, mode='w'):
-        #   Create/replace file;  return the file object.
-        fullpath = "%s/%s" % (self._checkFSPath(path), filename)
-        return open(fullpath, mode)
-
-
-    @security.private
-    def _createMetadataFile(self, path, filename, mode='w'):
-        #   Create/replace file;  return the file object.
-        extension = self.use_metadata_file and 'metadata' or 'properties'
-        fullpath = "%s/%s.%s" % (self._checkFSPath(path),
-                                 filename, extension)
-        file = open(fullpath, mode)
+        # dump folder properties and object index
+        metafile = self._createMetadataFile(fspath)
+        self._writeProperties(folder, metafile)
         if self.use_metadata_file:
-            file.write("[default]\n")
+            metafile.write("\n[Objects]\n")
         else:
-            file.write("[Default]\n")
-        return file
+            metafile.close()
+            metafile = open(fspath + '.objects', mode='w')
+        for objid, meta, updated, objts in dumped:
+            metafile.write('%s:%s\n' % (objid, meta))
+            if updated and meta != 'Folder': #TODO: should use ext, not meta
+                self.dumped.append((objts, meta, fspath + objid,))
+            if objid in objs:
+                del objs[objid] # object was not deleted
+        metafile.close()
 
-    
-    @security.private
-    def _dumpObject(self, object, path=None):
-        #   Dump one item, using path as prefix.
-        try:
-            handler = self._handlers.get(object.meta_type, None)
-            if handler is not None:
-                handler(self, object, path)
-                return 1
-        except ConflictError:
-            raise
-        except:
-            return -1
-        return 0
-            
+        # delete absent objects from the file system
+        for objid, meta in objs.items():
+            ext, dumper, loader = self._handlers.get(meta, ('', None, None))
+            fspathobj = self._getFSPathObj(fspath, objid, ext)
+            if ext == self._EXTDir:
+                shutil.rmtree(fspathobj)
+            else:
+                os.remove(fspathobj)
+                self._deleteMetadataFile(fspathobj)
+            # TODO: keep list to show in UI
 
-    @security.private
-    def _dumpObjects(self, objects, path=None):
-        #   Dump each item, using path as prefix.
-        dumped = []
-        for object in objects:
-            if self._dumpObject(object, path) > 0:
-                id = object.getId()
-                #if callable(id):
-                #    id = id()
-                dumped.append((id, object.meta_type))
+
+    security.declarePrivate('_dumpObjects')
+#    @security.private
+    def _dumpObjects(self, folder, objects, fspath):
+        """
+           Dump each item, using fspath as prefix.
+           fspath must be an absolute path ending with a folder separator.
+           Returns list of objects processed: [(objid, meta, dumped)]
+        """
+        dumped = [] # contains list of objects that can be dumped
+        for obj in objects:
+            objid = obj.getId()
+            objts = self._getObjts(folder, obj)
+            ext, dumper, loader = self._handlers.get(
+                obj.meta_type, ('', None, None))
+            if dumper is None: # unsupported meta_type
+                continue
+            fspathobj = self._getFSPathObj(fspath, objid, ext)
+
+            # handle cases where dump is always done
+            # if dump_all OR folder OR new object
+            if self.dump_all \
+               or ext == self._EXTDir \
+               or not os.path.exists(fspathobj):
+                if self._dumpObject(dumper, obj, fspathobj, ext) > 0:
+                    dumped.append((objid, obj.meta_type, True, objts))
+                continue
+
+            # handle previous load/dump time-barriers
+            if self.tslastdump and objts <= self.tslastdump:
+                # skip untouched objects but keep for the index (.metadata)
+                dumped.append((objid, obj.meta_type, False, objts))
+                continue
+            if self.tslastload and objts <= self.tslastload:
+                # avoid dumping objects just loaded
+                dumped.append((objid, obj.meta_type, False, objts))
+                continue
+
+            # dump only objects newer than corresponding file
+            filets = self._getFilets(fspathobj)
+            if objts <= filets:
+                dumped.append((objid, obj.meta_type, False, objts))
+                self.dump_conflicts.append((fspathobj, objts, filets))
+                continue
+            if self._dumpObject(dumper, obj, fspathobj, ext) > 0:
+                dumped.append((objid, obj.meta_type, True, objts))
         return dumped
 
 
-    @security.private
-    def _writeProperties(self, obj, file):
+    security.declarePrivate('_dumpObject')
+#    @security.private
+    def _dumpObject(self, dumper, obj, fspath, ext):
+        """   Dump one item, using fspath as prefix. """
+        if ext == self._EXTMeta:
+             # remove metadata extension (createMetadata does not expect it)
+            fspath = os.splitext(fspath)[0]
+        try:
+            dumper(self, obj, fspath)
+            return 1
+        except ConflictError:
+            raise
+        except Exception as ex:
+            self.dumped.append(('EXCEPTION dumping object:', fspath, str(ex)))
+            return 0
+
+
+    #
+    #   Utility methods
+    #
+
+
+    security.declarePrivate('_getFSPathObj')
+#    @security.private
+    def _getFSPathObj(self, folderpath, objid, ext):
+        """ Returns the absolute path for the object's main file.
+            Since a dumped object can use more than one file,
+            this method returns the "main" file that contains
+            the contents of the object, if applicable, else returns the
+            main metadata file.
+            This is the file used to check timestamps when syncing changes.
+        """
+        if ext == self._EXTSame: # no extension applicable
+            fname = objid
+        elif ext == self._EXTDir:  # folders, separator at the end
+            fname = os.path.join(objid, '')
+        elif ext == self._EXTMeta:  # only a metadata file is used
+            extension = self.use_metadata_file and '.metadata'\
+                                                or '.properties'
+            fname = objid + extension
+        else:
+            fname = objid + ext
+        return folderpath + fname
+
+
+    security.declarePrivate('_getObjts')
+#    @security.private
+    def _getObjts(self, folder, obj):
+        """ Returns the time stamp for an object"""
+        try:
+            objts = folder.last_modified(obj) # %Y-%m-%d %H:%M
+            # TODO: use binary representation from ob._p_mtime
+            # But, is it compatible with file.getmtime()?
+        except: # zope 2
+            ts = obj.bobobase_modification_time()
+            objts = ts.strftime("%Y-%m-%d %H:%M:%S")
+        return objts
+
+
+    security.declarePrivate('_getFilets')
+#    @security.private
+    def _getFilets(self, fspath):
+        """ Returns the time stamp for a file"""
+        ts = os.path.getmtime(fspath)
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+
+
+    security.declarePrivate('_checkInput')
+#    @security.private
+    def _checkInput(self):
+        #  Validate Dumper parameters (fspath)
+        if self.fspath is None:
+            raise RuntimeError('Dumper Error: file system path not set.')
+        if not os.path.isabs(self.fspath):
+            raise RuntimeError('Dumper Error: file system path must be absolute.')
+        if not os.path.exists(self.fspath):
+            raise RuntimeError('Dumper Error: file system path must exist.')
+
+
+    security.declarePrivate('_createMetadataFile')
+#    @security.private
+    def _createMetadataFile(self, fspath, mode='w'):
+        # Create/replace file; 
+        # return the metadata file object (*.properties or *.metadata)
+        # TODO: it would be better to support only the .metadata format to
+        #  simplify code and avoid syncing between dumps of different formats
+        extension = self.use_metadata_file and 'metadata' or 'properties'
+        fname = "%s.%s" % (fspath, extension)
+        metafile = open(fname, mode)
+        if self.use_metadata_file:
+            metafile.write("[default]\n")
+        else:
+            metafile.write("[Default]\n")
+        return metafile
+
+    
+    security.declarePrivate('_deleteMetadataFile')
+#    @security.private
+    def _deleteMetadataFile(self, fspath):
+        """
+           Delete the metadata file
+        """
+        extension = self.use_metadata_file and 'metadata' or 'properties'
+        fname = "%s.%s" % (fspath, extension)
+        os.remove(fname)
+
+    
+    security.declarePrivate('_writeProperties')
+#    @security.private
+    def _writeProperties(self, obj, metafile):
+        if getattr(obj.aq_base, '_proxy_roles', None):
+            metafile.write('proxy=%s\n' % ','.join(obj._proxy_roles))
         propIDs = obj.propertyIds()
         propIDs.sort()  # help diff out :)
         for propID in propIDs:
-            type = obj.getPropertyType(propID)
+            proptype = obj.getPropertyType(propID)
             value = obj.getProperty(propID)
-            file.write('%s:%s=%s\n' % (propID, type, value))
+            if proptype == 'boolean' and isinstance(value, int):
+                # it seems in old versions of zope/zodb/python boolean was a int
+                # which causes inconsistent dumping as 1/0 instead of True/False
+                # thus, force conversion to bool
+                value = bool(value)
+            metafile.write('%s:%s=%s\n' % (propID, proptype, value))
 
 
-    #
-    #   Type-specific dumpers
-    #
-    @security.private
-    def _dumpRoot(self, obj):
-        self._dumpObjects(obj.objectValues())
-
-
-    @security.private
-    def _dumpFolder(self, obj, path=None):
-        #   Recurse to dump items in a folder.
-        if path is None:
-            path = ''
-        path = os.path.join(path, obj.id)
-        file = self._createMetadataFile(path, '')
-        self._writeProperties(obj, file)
-        dumped = self._dumpObjects(obj.objectValues(), path)
-        dumped.sort() # help diff out :)
-        if self.use_metadata_file:
-            file.write("\n[Objects]\n")
-        else:
-            file.close()
-            file = self._createFile(path, '.objects')
-        for id, meta in dumped:
-            file.write('%s:%s\n' % (id, meta))
-        file.close()
-
-
-    @security.private
-    def _dumpDTML( self, obj, path=None, suffix='dtml' ):
-        #   Dump obj (assumed to be a DTML Method/Document) to the
-        #   filesystem as a file, appending 'suffix' to the name.
-        peer_id = obj.id()
-        file = self._createFile( path, '%s.%s' % ( peer_id, suffix ) )
-        text = obj.raw
-        if text[-1] != '\n':
-            text = '%s\n' % text
-        file.write( text )
-        file.close()
-
-    @security.private
-    def _dumpSecurityInfo(self, obj, file):
-        if getattr(obj.aq_base, '_proxy_roles', None):
-            file.write('proxy=%s\n' % ','.join(obj._proxy_roles))
+    security.declarePrivate('_dumpSecurityInfo')
+#    @security.private
+    def _dumpSecurityInfo(self, obj, metafile):
         security_header_written = 0
         valid_roles = obj.valid_roles()
         for perm_dict in obj.permission_settings():
@@ -284,390 +491,415 @@ class Dumper(SimpleItem):
             if roles or (acquire==0):
                 if not security_header_written:
                     security_header_written = 1
-                    file.write('\n[security]\n')
-                file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
+                    metafile.write('\n[security]\n')
+                metafile.write('%s=%d:%s\n' % \
+                    (perm_name, acquire, ','.join(roles)))
 
-    @security.private
-    def _dumpDTMLMethod( self, obj, path=None ):
+
+    #
+    #   Type-specific dumpers
+    #
+
+    security.declarePrivate('_dumpDTML')
+#    @security.private
+    def _dumpDTML(self, obj, fspath):
+        #   Dump obj (assumed to be a DTML Method/Document) to the
+        #   filesystem as a file, appending 'suffix' to the name.
+        objfile = open(fspath, mode='w')
+        text = obj.raw
+        if text[-1] != '\n':
+            text = '%s\n' % text
+        objfile.write(text)
+        objfile.close()
+
+
+    security.declarePrivate('_dumpDTMLMethod')
+#    @security.private
+    def _dumpDTMLMethod(self, obj, fspath):
         #   Dump properties of obj (assumed to be a DTML Method) to the
         #   filesystem as a file, with the accompanying properties file.
-        self._dumpDTML( obj, path )
-        file = self._createMetadataFile( path, '%s.dtml' % obj.id() )
+        self._dumpDTML(obj, fspath)
+        metafile = self._createMetadataFile(fspath)
         if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            self._dumpSecurityInfo(obj, file)
+            metafile.write('title=%s\n' % obj.title)
+            self._dumpSecurityInfo(obj, metafile)
         else:
-            file.write( 'title:string=%s\n' % obj.title )
-        file.close()
+            metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
 
-    @security.private
-    def _dumpZWikiPage( self, obj, path=None, suffix='zwiki' ):
-        peer_id = obj.id()
-        file = self._createFile( path, '%s.%s' % ( peer_id, suffix ) )
-        text = obj.text()
-        if text[-1] != '\n':
-            text = '%s\n' % text
-        file.write( text )
-        file.close()
 
-        if self.use_metadata_file:
-            file = self._createMetadataFile( path, '%s.%s' % ( peer_id,suffix))
-            self._writeProperties( obj, file )
-            self._dumpSecurityInfo(obj, file)
-            file.close()
-
-    @security.private
-    def _dumpDTMLDocument( self, obj, path=None ):
+    security.declarePrivate('_dumpDTMLDocument')
+#    @security.private
+    def _dumpDTMLDocument(self, obj, fspath):
         #   Dump properties of obj (assumed to be a DTML Document) to the
         #   filesystem as a file, with the accompanying properties file.
-        self._dumpDTML( obj, path )
-        file = self._createMetadataFile( path, '%s.dtml' % obj.id() )
-        self._writeProperties( obj, file )
-        file.close()
+        self._dumpDTML(obj, fspath)
+        metafile = self._createMetadataFile(fspath)
+        self._writeProperties(obj, metafile)
+        metafile.close()
 
-    @security.private
-    def _dumpExternalMethod( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be an Externa Method) to the
+
+    security.declarePrivate('_dumpExternalMethod')
+#    @security.private
+    def _dumpExternalMethod(self, obj, fspath):
+        #   Dump properties of obj (assumed to be an External Method) to the
         #   filesystem as a file.
-        file = self._createMetadataFile( path, '%s.em' % obj.id )
+        objfile = open(fspath, mode='w')
+        objfile.write('title:string=%s\n' % obj.title)
+        objfile.write('module:string=%s\n' % obj._module)
+        objfile.write('function:string=%s\n' % obj._function)
+        objfile.close()
         if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            file.write( 'module=%s\n' % obj._module )
-            file.write( 'function=%s\n' % obj._function )
-            self._dumpSecurityInfo(obj, file)
-        else:
-            file.write( 'title:string=%s\n' % obj.title )
-            file.write( 'module:string=%s\n' % obj._module )
-            file.write( 'function:string=%s\n' % obj._function )
-        file.close()
+            metafile = self._createMetadataFile(fspath)
+            self._dumpSecurityInfo(obj, metafile)
+            metafile.close()
 
 
-    @security.private
-    def _dumpFileOrImage(self, obj, path=None):
+    security.declarePrivate('_dumpFileOrImage')
+#    @security.private
+    def _dumpFileOrImage(self, obj, fspath):
         #   Dump properties of obj (assumed to be an Externa Method) to the
         #   filesystem as a file, with the accompanying properties file.
-        file = self._createMetadataFile(path, '%s' % obj.getId())
+        metafile = self._createMetadataFile(fspath)
         if self.use_metadata_file:
-            file.write('title=%s\n' % obj.title)
-            file.write('content_type=%s\n' % obj.content_type)
-            file.write('precondition=%s\n' % obj.precondition)
+            metafile.write('title=%s\n' % obj.title)
+            metafile.write('content_type=%s\n' % obj.content_type)
+            metafile.write('precondition=%s\n' % obj.precondition)
         else:
-            file.write('title:string=%s\n' % obj.title)
-            file.write('content_type:string=%s\n' % obj.content_type)
-            file.write('precondition:string=%s\n' % obj.precondition)
-        file.close()
-        file = self._createFile(path, obj.getId(), 'wb')
+            metafile.write('title:string=%s\n' % obj.title)
+            metafile.write('content_type:string=%s\n' % obj.content_type)
+            metafile.write('precondition:string=%s\n' % obj.precondition)
+        metafile.close()
+        objfile = open(fspath, mode='wb')
         data = obj.data
-        file.write(data)
-        # TODO: this is not working in Zope4
-        #if type(data) == type(''):
-        #    file.write(data)
-        #else:
-        #    while data is not None:
-        #        file.write(data.data)
-        #        data = data.next
-        file.close()
-
-
-    @security.private
-    def _dumpPythonMethod( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a Python Method) to the
-        #   filesystem as a file, with the accompanying properties file.
-        body_lines = obj._body.split( '\n' )
-        body = '\n    '.join( body_lines ) 
-        text = "def %s(%s)\n\n    %s" % ( obj.id, obj._params, body )
-        if text[-1] != '\n':
-            text = '%s\n' % text
-        file = self._createFile( path, '%s.py' % obj.id )
-        file.write( text )
-        file.close()
-        file = self._createMetadataFile( path, '%s.py' % obj.id )
-        if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            self._dumpSecurityInfo(obj, file)
-        else:
-            file.write( 'title:string=%s\n' % obj.title )
-        file.close()
-
-    @security.private
-    def _dumpPythonScript( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a Python Script) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.py' % obj.id )
-        file.write( obj.read() )
-        file.close()
-        file = self._createMetadataFile( path, '%s.py' % obj.id )
-        if self.use_metadata_file:
-            file.write( 'title=%s\n' % obj.title )
-            self._dumpSecurityInfo(obj, file)
-        else:
-            file.write( 'title:string=%s\n' % obj.title )
-        file.close()
-
-    @security.private
-    def _dumpControllerPythonScript( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a Python Script) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.cpy' % obj.id )
-        file.write( obj.read() )
-        file.close()
-        file = self._createMetadataFile( path, '%s.cpy' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.close()
-
-    @security.private
-    def _dumpValidatorScript( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a Controller Validator) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.vpy' % obj.id )
-        file.write( obj.read() )
-        file.close()
-        file = self._createMetadataFile( path, '%s.vpy' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.close()
-
-    @security.private
-    def _dumpControllerPageTemplate( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a ZopeControllerPageTemplate) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.cpt' % obj.id )
-        file.write( obj.read() )
-        file.close()
-        file = self._createMetadataFile( path, '%s.cpt' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.close()
-
-    @security.private
-    def _dumpPageTemplate( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a ZopePageTemplate) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.pt' % obj.id )
-        file.write( obj.read() )
-        file.close()
-        file = self._createMetadataFile( path, '%s.pt' % obj.id )
-        self._writeProperties( obj, file )
-        if self.use_metadata_file:
-            self._dumpSecurityInfo(obj, file)
-        file.close()
-
-    @security.private
-    def _dumpSQLMethod( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a SQL Method) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.zsql' % obj.id )
-        text = "%s" % obj.src
-        file.write(' <dtml-comment>\n')
-        file.write( 'title:%s\n' % obj.title )
-        file.write( 'arguments: %s\n'
-                     % ' '.join(obj.arguments_src.splitlines() ) )
-        file.write( 'connection_id:%s\n' % obj.connection_id )
-        file.write( 'max_rows:%s\n' % obj.max_rows_ )
-        file.write( 'max_cache:%s\n' % obj.max_cache_ )
-        file.write( 'cache_time:%s\n' % obj.cache_time_ )
-        file.write( 'class_name:%s\n' % obj.class_name_ )
-        file.write( 'class_file:%s\n' % obj.class_file_ )
-        file.write( '</dtml-comment>\n')
-        if text[-1] != '\n':
-            text = '%s\n' % text
-        file.write( text )
-        file.close()
-
-    @security.private
-    def _dumpZCatalog( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a ZCatalog) to the
-        #   filesystem as a file, with the accompanying properties file.
-        file = self._createFile( path, '%s.catalog' % obj.id )
-        for brain in obj.searchResults():
-            file.write( '%s\n' % obj.getpath( brain.data_record_id_ ) )
-        file.close()
-        file = self._createMetadataFile( path, '%s' % obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'vocab_id:string=%s\n' % obj.vocab_id )
-        file.write( 'threshold:int=%s\n' % obj.threshold )
-        file.close()
-        file = self._createFile( path, '%s.indexes' % obj.id )
-        for index in obj.index_objects():
-            file.write( '%s:%s\n' % ( index.id, index.meta_type ) )
-        file.close()
-        file = self._createFile( path, '%s.metadata' % obj.id )
-        for column in obj.schema():
-            file.write( '%s\n' % column )
-        file.close()
-    
-    @security.private
-    def _dumpZClass( self, obj, path=None ):
-        #   Dump properties of obj (assumed to be a ZClass) to the
-        #   filesystem as a directory, including propertysheets and
-        #   methods, as well as any nested ZClasses.
-        if path is None:
-            path = ''
-        path = os.path.join( path, obj.id )
-        file = self._createMetadataFile( path, '' )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'metatype:string=%s\n' % obj._zclass_.meta_type )
-        file.write( 'bases:tokens=%s\n'
-                  % ','.join( map( lambda klass: str(klass), obj._zbases ) )
-                  )
-        file.write( 'class_id:int=%s\n' % obj._zclass_.__module__ )
-        file.close()
-
-        #   Dump icon
-        file = self._createFile( path, '.icon', 'wb' )
-        img = obj._zclass_.ziconImage
-        data = img.data
-        if type( data ) == type( '' ):
-            file.write( data )
+        if type(data) == binary_type:
+            objfile.write(data)
         else:
             while data is not None:
-                file.write( data.data )
+                objfile.write(data.data)
                 data = data.next
-        file.close()
+        objfile.close()
 
-        #   Dump views
-        file = self._createFile( path, '.views' )
-        for view in obj.propertysheets.views.data():
-            file.write( '%s:%s\n' % ( view[ 'label' ], view[ 'action' ] ) )
-        file.close()
+    security.declarePrivate('_dumpPythonMethod')
+#    @security.private
+    def _dumpPythonMethod(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a Python Method) to the
+        #   filesystem as a file, with the accompanying properties file.
+        body_lines = obj._body.split('\n')
+        body = '\n    '.join(body_lines) 
+        text = "def %s(%s)\n\n    %s" % (obj.id, obj._params, body)
+        if text[-1] != '\n':
+            text = '%s\n' % text
+        objfile = open(fspath, mode='w')
+        objfile.write(text)
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        if self.use_metadata_file:
+            metafile.write('title=%s\n' % obj.title)
+            self._dumpSecurityInfo(obj, metafile)
+        else:
+            metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
 
-        #   Dump property sheets.
-        sheetpath = os.path.join( path, 'propertysheets' , 'common' )
-        sheets = self._dumpObjects( obj.propertysheets.common.objectValues()
-                                  , sheetpath )
-        sheets.sort() # help diff out :)
-        file = self._createFile( sheetpath, '.objects' )
-        for id, meta in sheets:
-            file.write( '%s:%s\n' % ( id, meta ) )
-        file.close()
 
-        #   Dump methods
-        methodpath = os.path.join( path, 'propertysheets', 'methods' )
-        methods = self._dumpObjects( obj.propertysheets.methods.objectValues()
-                                   , methodpath )
-        methods.sort() # help diff out :)
-        file = self._createFile( methodpath, '.objects' )
-        for id, meta in methods:
-            file.write( '%s:%s\n' % ( id, meta ) )
-        file.close()
-    
-    @security.private
-    def _dumpZClassPropertySheet( self, obj, path=None ):
+    security.declarePrivate('_dumpPythonScript')
+#    @security.private
+    def _dumpPythonScript(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a Python Script) to the
+        #   filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        objfile.write(obj.read())
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        if self.use_metadata_file:
+            metafile.write('title=%s\n' % obj.title)
+            self._dumpSecurityInfo(obj, metafile)
+        else:
+            metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
+
+
+    security.declarePrivate('_dumpControllerPythonScript')
+#    @security.private
+    def _dumpControllerPythonScript(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a Python Script) to the
+        #   filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        objfile.write(obj.read())
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
+
+
+    security.declarePrivate('_dumpValidatorScript')
+#    @security.private
+    def _dumpValidatorScript(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a Controller Validator) to
+        #   the filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        objfile.write(obj.read())
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
+
+
+    security.declarePrivate('_dumpControllerPageTemplate')
+#    @security.private
+    def _dumpControllerPageTemplate(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a ZopeControllerPageTemplate)
+        #   to the filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        objfile.write(obj.read())
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
+
+
+    security.declarePrivate('_dumpPageTemplate')
+#    @security.private
+    def _dumpPageTemplate(self, obj, fspath):
+        #   Dump contents of obj (assumed to be a ZopePageTemplate) to the
+        #   filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        objfile.write(obj.read())
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        self._writeProperties(obj, metafile)
+        if self.use_metadata_file:
+            self._dumpSecurityInfo(obj, metafile)
+        metafile.close()
+
+
+    security.declarePrivate('_dumpSQLMethod')
+#    @security.private
+    def _dumpSQLMethod(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a SQL Method) to the
+        #   filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        text = "%s" % obj.src
+        objfile.write(' <dtml-comment>\n')
+        objfile.write('title:%s\n' % obj.title)
+        objfile.write('arguments:%s\n'
+                     % ' '.join(obj.arguments_src.splitlines()))
+        objfile.write('connection_id:%s\n' % obj.connection_id)
+        objfile.write('max_rows:%s\n' % obj.max_rows_)
+        objfile.write('max_cache:%s\n' % obj.max_cache_)
+        objfile.write('cache_time:%s\n' % obj.cache_time_)
+        objfile.write('class_name:%s\n' % obj.class_name_)
+        objfile.write('class_file:%s\n' % obj.class_file_)
+        objfile.write('</dtml-comment>\n')
+        if text[-1] != '\n':
+            text = '%s\n' % text
+        objfile.write(text)
+        objfile.close()
+
+
+    security.declarePrivate('_dumpZCatalog')
+#    @security.private
+    def _dumpZCatalog(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a ZCatalog) to the
+        #   filesystem as a file, with the accompanying properties file.
+        objfile = open(fspath, mode='w')
+        for brain in obj.searchResults():
+            objfile.write('%s\n' % obj.getpath(brain.data_record_id_))
+        objfile.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.write('vocab_id:string=%s\n' % obj.vocab_id)
+        metafile.write('threshold:int=%s\n' % obj.threshold)
+        metafile.close()
+        fspath.replace()
+        objfile = open(fspath.replace('.catalog', '.indexes'), mode='w')
+        for index in obj.index_objects():
+            objfile.write('%s:%s\n' % (index.id, index.meta_type))
+        objfile.close()
+        objfile = open(fspath.replace('.catalog', '.metadata'), mode='w')
+        for column in obj.schema():
+            objfile.write('%s\n' % column)
+        objfile.close()
+
+
+    security.declarePrivate('_dumpZClass')
+#    @security.private
+    def _dumpZClass(self, obj, fspath):
         #   Dump properties of obj (assumed to be a ZClass) to the
         #   filesystem as a directory, including propertysheets and
         #   methods, as well as any nested ZClasses.
-        file = self._createFile( path, obj.id )
-        self._writeProperties( obj, file )
-        file.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.write('metatype:string=%s\n' % obj._zclass_.meta_type)
+        metafile.write('bases:tokens=%s\n'
+                  % ','.join(map(lambda klass: str(klass), obj._zbases))
+                 )
+        metafile.write('class_id:int=%s\n' % obj._zclass_.__module__)
+        metafile.close()
 
-        file = self._createMetadataFile( path, obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.close()
+        #   Dump icon
+        objfile = open(fspath + '.icon', mode='wb')
+        img = obj._zclass_.ziconImage
+        data = img.data
+        if type(data) == binary_type:
+            objfile.write(data)
+        else:
+            while data is not None:
+                objfile.write(data.data)
+                data = data.next
+        objfile.close()
+
+        #   Dump views
+        objfile = open(fspath + '.views', mode='w')
+        for view in obj.propertysheets.views.data():
+            objfile.write('%s:%s\n' % (view[ 'label' ], view[ 'action' ]))
+        objfile.close()
+
+        #   Dump property sheets.
+        sheetpath = os.path.join(fspath, 'propertysheets', 'common', '')
+        if not os.path.exists(sheetpath):
+            os.makedirs(sheetpath)
+        sheets = self._dumpObjects(obj.propertysheets.common,
+            obj.propertysheets.common.objectValues(), sheetpath)
+        sheets.sort() # help diff out :)
+        metafile = open(sheetpath + '.objects', mode='w')
+        for objid, meta in sheets:
+            metafile.write('%s:%s\n' % (objid, meta))
+        metafile.close()
+
+        #   Dump methods
+        methodpath = os.path.join(fspath, 'propertysheets', 'methods', '')
+        if not os.path.exists(methodpath):
+            os.makedirs(methodpath)
+        sheets = self._dumpObjects(obj.propertysheets.methods,
+            obj.propertysheets.methods.objectValues(), methodpath)
+        methods.sort() # help diff out :)
+        metafile = open(methodpath + '.objects', mode='w')
+        for objid, meta in methods:
+            metafile.write('%s:%s\n' % (objid, meta))
+        metafile.close()
+
     
-    @security.private
-    def _dumpPermission( self, obj, path=None ):
+    security.declarePrivate('_dumpZClassPropertySheet')
+#    @security.private
+    def _dumpZClassPropertySheet(self, obj, fspath):
+        #   Dump properties of obj (assumed to be a ZClassPropertySheet) to the
+        #   filesystem as a directory.
+        propfile = open(fspath, mode='w')
+        self._writeProperties(obj, propfile)
+        propfile.close()
+
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.close()
+
+    
+    security.declarePrivate('_dumpPermission')
+#    @security.private
+    def _dumpPermission(self, obj, fspath):
         #   Dump properties of obj (assumed to be a Zope Permission) to the
         #   filesystem as a .properties file.
-        file = self._createMetadataFile( path, obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'name:string=%s\n' % obj.name )
-        file.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.write('name:string=%s\n' % obj.name)
+        metafile.close()
 
-    @security.private
-    def _dumpFactory( self, obj, path=None ):
+
+    security.declarePrivate('_dumpFactory')
+#    @security.private
+    def _dumpFactory(self, obj, fspath):
         #   Dump properties of obj (assumed to be a Zope Factory) to the
         #   filesystem as a .properties file.
-        file = self._createMetadataFile( path, obj.id )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'object_type:string=%s\n' % obj.object_type )
-        file.write( 'initial:string=%s\n' % obj.initial )
-        file.write( 'permission:string=%s\n' % obj.permission )
-        file.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.write('object_type:string=%s\n' % obj.object_type)
+        metafile.write('initial:string=%s\n' % obj.initial)
+        metafile.write('permission:string=%s\n' % obj.permission)
+        metafile.close()
 
-    @security.private
-    def _dumpWizard( self, obj, path=None ):
+
+    security.declarePrivate('_dumpWizard')
+#    @security.private
+    def _dumpWizard(self, obj, fspath):
         #   Dump properties of obj (assumed to be a Wizard) to the
         #   filesystem as a directory, containing a .properties file
         #   and analogues for the pages.
-        if path is None:
-            path = ''
-        path = os.path.join( path, obj.id )
-        file = self._createMetadataFile( path, '' )
-        file.write( 'title:string=%s\n' % obj.title )
-        file.write( 'description:text=[[%s]]\n' % obj.description )
-        file.write( 'wizard_action:string=%s\n' % obj.wizard_action )
-        file.write( 'wizard_icon:string=%s\n' % obj.wizard_icon )
-        file.write( 'wizard_hide_title:int=%s\n' % obj.wizard_hide_title )
-        file.write( 'wizard_stepcount:int=%s\n' % obj.wizard_stepcount )
-        file.close()
+        metafile = self._createMetadataFile(fspath)
+        metafile.write('title:string=%s\n' % obj.title)
+        metafile.write('description:text=[[%s]]\n' % obj.description)
+        metafile.write('wizard_action:string=%s\n' % obj.wizard_action)
+        metafile.write('wizard_icon:string=%s\n' % obj.wizard_icon)
+        metafile.write('wizard_hide_title:int=%s\n' % obj.wizard_hide_title)
+        metafile.write('wizard_stepcount:int=%s\n' % obj.wizard_stepcount)
+        metafile.close()
 
-        pages = self._dumpObjects( obj.objectValues(), path )
+        pages = self._dumpObjects(obj, obj.objectValues(), fspath)
 
         pages.sort() # help diff out :)
-        file = self._createFile( path, '.objects' )
-        for id, meta in pages:
-            file.write( '%s:%s\n' % ( id, meta ) )
-        file.close()
+        objfile = open(fspath + '.objects', mode='w')
+        for objid, meta in pages:
+            objfile.write('%s:%s\n' % (objid, meta))
+        objfile.close()
 
-    @security.private
-    def _dumpWizardPage( self, obj, path=None ):
+
+    security.declarePrivate('_dumpWizardPage')
+#    @security.private
+    def _dumpWizardPage(self, obj, fspath):
         #   Dump properties of obj (assumed to be a WizardPage) to the
         #   filesystem as a file, appending ".wizardpage" to the name.
-        self._dumpDTML( obj, path, 'wizardpage' )
-        file = self._createMetadataFile( path, obj.id() )
-        self._writeProperties( obj, file )
-        file.close()
+        self._dumpDTML(obj, fspath)
+        metafile = self._createMetadataFile(fspath)
+        self._writeProperties(obj, metafile)
+        metafile.close()
 
-    @security.private
-    def _dumpFormulatorForm( self, obj, path=None ):
-        if path is None:
-            path = ''
-        file = self._createFile(path, obj.id + '.form')
-        file.write(obj.get_xml())
-        file.close()
 
-    _handlers = { 'DTML Method'     : _dumpDTMLMethod
-                , 'DTML Document'   : _dumpDTMLDocument
-                , 'Folder'          : _dumpFolder
-                , 'BTreeFolder2'    : _dumpFolder
-                , 'External Method' : _dumpExternalMethod
-                , 'File'            : _dumpFileOrImage
-                , 'Image'           : _dumpFileOrImage
-                , 'Python Method'   : _dumpPythonMethod
-                , 'Script (Python)' : _dumpPythonScript
-                , 'Controller Python Script' : _dumpControllerPythonScript
-                , 'Controller Validator' : _dumpValidatorScript
-                , 'Controller Page Template' : _dumpControllerPageTemplate
-                , 'Page Template'   : _dumpPageTemplate
-                , 'Z SQL Method'    : _dumpSQLMethod
-                , 'ZCatalog'        : _dumpZCatalog
-                , 'Z Class'         : _dumpZClass
-                , 'Common Instance Property Sheet'
-                                    : _dumpZClassPropertySheet
-                , 'Zope Permission' : _dumpPermission
-                , 'Zope Factory'    : _dumpFactory
-                , 'Wizard'          : _dumpWizard
-                , 'Wizard Page'     : _dumpWizardPage
-                , 'Formulator Form' : _dumpFormulatorForm
-               #, 'SQL DB Conn'     : _dumpDBConn
-                , 'ZWiki Page'      : _dumpZWikiPage
-                }
+    security.declarePrivate('_dumpFormulatorForm')
+#    @security.private
+    def _dumpFormulatorForm(self, obj, fspath):
+        objfile = open(fspath, mode='w')
+        objfile.write(obj.get_xml())
+        objfile.close()
 
-    @security.protected(USE_DUMPER_PERMISSION)
-    def testDump( self, peer_path, path=None, REQUEST=None ):
+
+    security.declarePrivate('_dumpZWikiPage')
+#    @security.private
+    def _dumpZWikiPage(self, obj, fspath):
+        peer_id = obj.id()
+        objfile = open(fspath, mode='w')
+        text = obj.text()
+        if text[-1] != '\n':
+            text = '%s\n' % text
+        objfile.write(text)
+        objfile.close()
+
+        if self.use_metadata_file:
+            metafile = self._createMetadataFile(fspath)
+            self._writeProperties(obj, metafile)
+            self._dumpSecurityInfo(obj, metafile)
+            metafile.close()
+
+
+    security.declareProtected(USE_DUMPER_PERMISSION, 'testDump')
+#    @security.protected(USE_DUMPER_PERMISSION)
+    def testDump(self, peer_path, path=None, REQUEST=None):
         """
             Test dumping a single item.
         """
-        obj = self.aq_parent.restrictedTraverse( peer_path )
-        self._dumpObject( obj )
+        obj = self.aq_parent.restrictedTraverse(peer_path)
+        self._dumpObject(obj)
         if REQUEST is not None:
-            REQUEST['RESPONSE'].redirect( self.absolute_url()
+            REQUEST['RESPONSE'].redirect(self.absolute_url()
                                         + '/editForm'
                                         + '?manage_tabs_message=%s+dumped.'
                                         % peer_path
-                                        )
+                                       )
 
-# LOAD from file system
+    ########
+    ##  LOAD from file system
+    ########
 
-    @security.protected(USE_DUMPER_PERMISSION)
+    security.declareProtected(USE_DUMPER_PERMISSION, 'loadFromFS')
+    #    @security.protected(USE_DUMPER_PERMISSION)
     def loadFromFS(self, REQUEST=None):
         """
            Browse recursively for files and metadata in the file system,
@@ -675,27 +907,169 @@ class Dumper(SimpleItem):
            in Data.fs, in the same folder as the current Dumper object.
         """
         if REQUEST and 'fspath' in REQUEST.form:
-            self._setFSPath(REQUEST.form['fspath'])
+            fspath = REQUEST.form['fspath']
+            use_metadata_file = REQUEST.form.get('use_metadata_file', 0)
+            dump_all = REQUEST.form.get('dump_all', 0)
+            load_all = REQUEST.form.get('load_all', 0)
+            self.edit(fspath, use_metadata_file, dump_all, load_all)
 
-        parent = self.aq_parent.aq_base
-        folder = self.aq_parent
-        if getattr(parent, 'isTopLevelPrincipiaApplicationObject', 0):
-            self._loadFolder(folder, '')
-        else:
-            self._loadFolder(folder, folder.getId())
+        fspath = os.path.join(self.fspath, '')
+        folder = self.aq_parent # fsdump instance container
+        self.loaded = []
+        self.load_conflicts = []
+        self._loadFolder(folder, '', fspath)
+        self.tslastload = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
         if REQUEST is not None:
-            REQUEST['RESPONSE'].redirect(
-                  self.absolute_url() + '/editForm' +
-                  '?manage_tabs_message=Objects+loaded.')
+            REQUEST['RESPONSE'].redirect(self.absolute_url()
+                                      + '/editForm'
+                                      + '?manage_tabs_message=Objects+loaded.')
  
 
-    @security.private
-    def _openMetadataFile(self, fullpath):
+    security.declarePrivate('_loadFolder')
+    #    @security.private
+    def _loadFolder(self, container, foldername, fspath):
+        """
+           Load fs folder foldername into ZODB container (recursive)
+           The folder contents are listed in .objects or .metadata[objects]
+           Format: objectid:meta_type\n
+           It will also delete files/folders in the ZODB database if they
+           no longer exist in the file system.
+           It does that by loading a possibly existing metadata file to compare
+           with the list of dumped objects
+           Note: files created outside zope, e.g., by vim, need to be
+                 registered in .metadata (or .objects)
+        """
+        if foldername == '':
+            # top folder of fsdump, it already exists, it's "container"
+            folder = container
+        else:
+            # create folder in DB if it doesn't exist
+            if ZOPE == 4:
+                folder = container.get(foldername, None)
+            else:
+                if container.hasObject(foldername):
+                    folder = container._getOb(foldername, None)
+                else:
+                    folder = None
+            if folder is None:
+                manage_addFolder(container, foldername)
+                if ZOPE == 4:
+                    folder = container.get(foldername)
+                else:
+                    folder = container._getOb(foldername, None)
+        metafile = self._openMetadataFile(fspath)
+        props = self._readProperties(metafile)
+        self._loadProperties(folder, props)
+        if self.use_metadata_file:
+            try: # PY3
+                line = next(metafile) # skip header "[Objects]"
+            except: #  py < 2.6
+                line = metafile.next() # skip header "[Objects]"
+            # remember readline() not compatible with line iterator
+        else:
+            # close .metadata file and open .objects file
+            metafile.close()
+            metafile = open(fspath + '.objects')
+        # load object list from file system, possibly partial, i.e.,
+        # without new fs objects that might have been created with an editor
+        # and not registered in .metadata
+        objs = {}
+        for line in metafile:
+            objid, meta = line[:-1].split(':')
+            objs[objid] = meta
+        metafile.close()
+        self._loadObjects(folder, objs, fspath)
+        # delete ZODB objects no longer in the file system
+        # unless they are not supported, keep them
+        for obj in folder.objectValues(): 
+            meta = obj.meta_type
+            ext, dumper, loader = self._handlers.get(meta, ('', None, None))
+            if not dumper: continue # don't touch unsupported objects
+            objid = obj.getId()
+            if objid in objs: continue # skip objects which exist in FS
+            folder.manage_delObjects([objid])
+            # TODO: keep list to show in UI
+
+
+    security.declarePrivate('_loadObjects')
+#    @security.private
+    def _loadObjects(self, folder, objs, fspath):
+        #   Load each obj (or folder) listed in objs from the file system
+        # objs is a dict objid -> meta
+        for objid, meta in objs.items():
+            ext, dumper, loader = self._handlers.get(
+                meta, ('', None, None))
+            if loader is None: # unsupported meta_type
+                continue
+            fspathobj = self._getFSPathObj(fspath, objid, ext)
+
+            # handle cases where load is always done
+            obj = None
+            if ZOPE == 4:
+                obj = folder.get(objid, None)
+            else:
+                obj = folder._getOb(objid, None)
+            # if load_all objects OR new object OR is folder
+            if self.load_all \
+               or obj is None \
+               or ext == self._EXTDir:
+                self._loadObject(loader, folder, objid, fspathobj, ext)
+                continue
+
+            # hanlde load/dump time barriers
+            filets = self._getFilets(fspathobj)
+            if self.tslastload and filets <= self.tslastload:
+                # skip files older than last load
+                continue
+            if self.tslastdump and filets <= self.tslastdump:
+                # skip files just dumped
+                continue
+
+            # load only files newer than corresponding (existing) objects
+            objts = self._getObjts(folder, obj)
+            if  filets <= objts:
+                self.load_conflicts.append(fspathobj)
+                continue
+            self._loadObject(loader, folder, objid, fspathobj, ext)
+
+
+    security.declarePrivate('_loadObject')
+#    @security.private
+    def _loadObject(self, loader, folder, objid, fspath, ext):
+        """   Load file fspath as an object with name objid into folder. """
+        if ext == self._EXTMeta:
+            fspath = os.splitext(fspath)[0]
+        if ext != self._EXTDir and folder.hasObject(objid):
+            folder._delObject(objid)
+        try:
+            loader(self, folder, objid, fspath)
+            self.loaded.append(fspath)
+            return 1
+        except:
+            return 0
+
+
+    ## Utility methods
+
+
+    security.declarePrivate('_openMetadataFile')
+#    @security.private
+    def _openMetadataFile(self, fspath, mode='r'):
         #   open properties file in path;  return the file object.
         extension = self.use_metadata_file and '.metadata' or '.properties'
-        metafile = open(fullpath + extension, mode='r')
-        line = metafile.readline()
+        metafile = open(fspath + extension, mode=mode)
+        # get rid of the section header ([Default])
+        try:  # PY3
+            line = next(metafile)
+        except StopIteration:
+            # The metadata file is empty
+            # It should not happen unless the dump broke previously and
+            # the file was not created correctly
+            # It will be recreated at some point
+            pass
+        except: # py < 2.6
+            line = metafile.next()
         # TODO: check contents of first line, per:
         #if self.use_metadata_file:
         #    file.write("[default]\n")
@@ -704,7 +1078,8 @@ class Dumper(SimpleItem):
         return metafile
     
 
-    @security.private
+    security.declarePrivate('_readProperties')
+#    @security.private
     def _readProperties(self, metafile):
         # Loading of properties is split in two parts: first read
         # into a dict then load as properties in _loadProperties
@@ -727,7 +1102,8 @@ class Dumper(SimpleItem):
         return props
 
 
-    @security.private
+    security.declarePrivate('_loadProperties')
+#    @security.private
     def _loadProperties(self, obj, props):
         # See note for _readProperties. If a property is loaded
         # separately as an attribute, then it should be removed
@@ -735,7 +1111,8 @@ class Dumper(SimpleItem):
         if not props: return
         if 'proxy' in props:
             proxy = props.pop('proxy')
-            obj.aq_base._proxy_roles = proxy.split(',')
+            #obj.manage_proxy(proxy.split(','))
+            obj._proxy_roles = tuple(proxy.split(','))
         for propid, valtype in props.items():
             #try: not all objects are PropertyManager
             if obj.hasProperty(propid):
@@ -747,12 +1124,13 @@ class Dumper(SimpleItem):
             #    print(sys.exc_info()[0])
 
 
-    @security.private
+    security.declarePrivate('_loadSecurityInfo')
+#    @security.private
     def _loadSecurityInfo(self, obj, metafile):
         # not yet implemented, need to figure out api to register permissions. 
         # in AccessControl/rolemanager.py manage_permission
         # manage_permission(self, permission_to_manage, roles=[], acquire=0)
-        # note that proxy roles are loaded in loadProperties
+        # note that proxy roles are loaded in _loadProperties
         security_header_written = 0
         valid_roles = obj.valid_roles()
         for perm_dict in obj.permission_settings():
@@ -768,86 +1146,41 @@ class Dumper(SimpleItem):
                     file.write('\n[security]\n')
                 file.write('%s=%d:%s\n' % (perm_name, acquire, ','.join(roles)))
 
-    @security.private
-    def _loadOneFile(self, folder, fname, meta, path=None):
-        #   Load one file system item (file or folder)
-        loader = self._loaders.get(meta, None)
-        if loader is not None:
-            loader(self, folder, fname, path)
-        else: print('no loader')
-            
-
-    @security.private
-    def _loadFiles(self, folder, files, path=None):
-        #   Load each file (or folder) from the file system
-        for fname, meta in files:
-            #print('load ', fname, meta)
-            self._loadOneFile(folder, fname, meta, path)
-
 
     #
     #   Type-specific loaders
     #
 
 
-    @security.private
-    def _loadFolder(self, folder, fname='', path=None):
-        #   Recursively load items from a folder.
-        #   path is the relative file system path corresponding to folder,
-        #   except for the top folder, which should be None and fname==''
-        #   The folder contents are listed in .objects or .metadata[objects]
-        #   Format: objectid:meta_type\n
-        if path is None: 
-            # top folder of fsdump, already exists
-            # joins the path and adds a / at the end
-            path = os.path.join(fname, '')
-        else:
-            # joins the path and adds a / at the end
-            path = os.path.join(path, fname, '')
-            obj = Folder(fname)
-            folder._setObject(fname, obj)
-            folder = folder._getOb(fname)
-        fullpath = self._buildPathString(path)
-        metafile = self._openMetadataFile(fullpath)
-        props = self._readProperties(metafile)
-        self._loadProperties(folder, props)
-        if self.use_metadata_file:
-            metafile.readline() # skip header "[Objects]"
-        else:
-            # close .metadata file and open .objects file
-            metafile.close()
-            metafile = open(fullpath + '/.objects', mode='r')
-        files = []
-        for line in metafile:
-            propid, meta = line[:-1].split(':')
-            files.append((propid, meta))
-        metafile.close()
-        self._loadFiles(folder, files, path)
-
-
-    @security.private
-    def _loadPageTemplate(self, folder, fname, path=None):
+    security.declarePrivate('_loadPageTemplate')
+#    @security.private
+    def _loadPageTemplate(self, folder, objid, fspath):
         #   Load a ZopePageTemplate from the filesystem,
         #   with the accompanying properties file.
-        fullpath = "%s/%s.pt" % (self._buildPathString(path), fname)
-        objfile = open(fullpath, mode='r', encoding='latin-1')
+        if PY3:
+            objfile = open(fspath, mode='r', encoding=Z2ENC)
+        else: # py2
+            objfile = open(fspath, mode='r')
         txt = objfile.read()
         objfile.close()
-        obj = ZopePageTemplate(fname, txt)
-        metafile = self._openMetadataFile(fullpath)
+        manage_addPageTemplate(folder, objid, text=txt)
+        if ZOPE == 4:
+            obj = folder[objid]
+        else:
+            obj = folder._getOb(objid, None)
+        metafile = self._openMetadataFile(fspath)
         props = self._readProperties(metafile)
         self._loadProperties(obj, props)
         metafile.close()
-        folder._setObject(fname, obj)
 
 
-    @security.private
-    def _loadSQLMethod(self, folder, fname, path=None):
+    security.declarePrivate('_loadSQLMethod')
+#    @security.private
+    def _loadSQLMethod(self, folder, objid, fspath):
         #  Load attributes of a SQL Method from the filesystem
         #  ZSQL do not use properties, therefore the object's attributes
         #  are store together with the SQL statement in a <dtml-comment>
-        fullpath = "%s/%s.zsql" % (self._buildPathString(path), fname)
-        objfile = open(fullpath, mode='r')
+        objfile = open(fspath, mode='r')
         objfile.readline() # skip <dtml-comment>\n
         attrs = {}
         for i in range(8):
@@ -859,118 +1192,158 @@ class Dumper(SimpleItem):
         objfile.readline() # skip </dtml-comment>\n
         text = objfile.read()
         objfile.close()
-        obj = SQL(fname, attrs['title'], attrs['connection_id'],
-                  attrs['arguments'], text)
+        manage_addZSQLMethod(folder, objid, attrs['title'],
+            attrs['connection_id'], attrs['arguments'], text)
+        if ZOPE == 4:
+            obj = folder[objid]
+        else:
+            obj = folder._getOb(objid, None)
         obj.manage_advanced(attrs['max_rows'], attrs['max_cache'],
-                            attrs['cache_time'], attrs['class_name'],
-                            attrs['class_file'])
-        folder._setObject(fname, obj)
+            attrs['cache_time'], attrs['class_name'], attrs['class_file'])
 
 
-    @security.private
-    def _loadPythonScript(self, folder, fname, path=None):
+    security.declarePrivate('_loadPythonScript')
+#    @security.private
+    def _loadPythonScript(self, folder, objid, fspath):
         #   Load a python script from the file system
         #   and the accompanying properties file.
-        fullpath = "%s/%s.py" % (self._buildPathString(path), fname)
-        objfile = open(fullpath, mode='r', encoding='latin-1')
-        text = objfile.read()
-        objfile.close()
-        obj = PythonScript(fname)
-        obj.write(text)
-        metafile = self._openMetadataFile(fullpath)
-        line = metafile.readline()
+        # read title from metadata
+        metafile = self._openMetadataFile(fspath)
+        try:  # PY3
+            line = next(metafile)
+        except: # py < 2.6
+            line = metafile.next()
         eq = line.find('=')
         prop = line[:eq]
-        value = line[eq+1:-1]
-        obj.ZPythonScript_setTitle(value)  
-        metafile.close()
-        folder._setObject(fname, obj)
-
-
-    @security.private
-    def _loadFile(self, folder, fname, path=None):
-        fullpath = "%s/%s" % (self._buildPathString(path), fname)
-        metafile = self._openMetadataFile(fullpath)
-        props = self._readProperties(metafile)
-        metafile.close()
-        # code adapted from OFS/Image.py - manage_addFile
-        # First, we create the file without data:
-        obj = File(fname, props['title'][0], b'',
-                   props['content_type'][0],
-                   props['precondition'][0])
-        folder._setObject(fname, obj)
-        # Now we "upload" the data.  By doing this in two steps, we
-        # can use a database trick to make the upload more efficient.
-        objfile = open(fullpath, mode='rb')
-        obj.manage_upload(objfile.read())
+        title = line[eq+1:-1]
+        manage_addPythonScript(folder, objid, title)
+        if ZOPE == 4:
+            obj = folder[objid]
+        else:
+            obj = folder._getOb(objid, None)
+        try: # PY3
+            objfile = open(fspath, mode='r', encoding=Z2ENC)
+        except: # py2
+            objfile = open(fspath, mode='r')
+        text = objfile.read()
         objfile.close()
-        #if content_type:
-        #    obj.content_type = content_type
-        # notify(ObjectCreatedEvent(newFile))
+        obj.write(text)
+        # TODO: load permissions
+        metafile.close()
 
 
-    @security.private
-    def _loadImage(self, folder, fname, path=None):
-        fullpath = "%s/%s" % (self._buildPathString(path), fname)
-        metafile = self._openMetadataFile(fullpath)
+    security.declarePrivate('_loadFile')
+#    @security.private
+    def _loadFile(self, folder, objid, fspath):
+        """ Load a file """
+        metafile = self._openMetadataFile(fspath)
         props = self._readProperties(metafile)
         metafile.close()
-        # code adapted from OFS/Image.py - manage_addFile
-        # First, we create the file without data:
-        obj = Image(fname, props['title'][0], b'',
-                   props['content_type'][0],
-                   props['precondition'][0])
-        folder._setObject(fname, obj)
-        # Now we "upload" the data.  By doing this in two steps, we
-        # can use a database trick to make the upload more efficient.
-        objfile = open(fullpath, mode='rb')
-        obj.manage_upload(objfile.read())
+        objfile = open(fspath, mode='rb')
+        title = props['title'][0]
+        ct = props['content_type'][0]
+        pc = props['precondition'][0]
+        manage_addFile(folder, objid, objfile, title, pc, ct)
         objfile.close()
-        #if content_type:
-        #    obj.content_type = content_type
-        # notify(ObjectCreatedEvent(newFile))
 
 
-    @security.private
-    def _loadExternalMethod(self, folder, fname, path=None):
-        fullpath = "%s/%s.em" % (self._buildPathString(path), fname)
-        metafile = self._openMetadataFile(fullpath)
+    security.declarePrivate('_loadImage')
+#    @security.private
+    def _loadImage(self, folder, objid, fspath):
+        """ Load an image """
+        metafile = self._openMetadataFile(fspath)
         props = self._readProperties(metafile)
-        # TODO:   self._dumpSecurityInfo(obj, file)
         metafile.close()
-        obj = ExternalMethod(fname,
-                             props['title'][0],
-                             props['module'][0],
-                             props['function'][0])
-        folder._setObject(fname, obj)
+        objfile = open(fspath, mode='rb')
+        title = props['title'][0]
+        ct = props['content_type'][0]
+        pc = props['precondition'][0]
+        manage_addImage(folder, objid, objfile, title, pc, ct)
+        objfile.close()
 
 
-    _loaders = { 'Folder'          : _loadFolder,
-                 'Page Template'   : _loadPageTemplate,
-                 'Z SQL Method'    : _loadSQLMethod,
-                 'Script (Python)' : _loadPythonScript,
-                 'File'            : _loadFile,
-                 'Image'           : _loadImage,
-                 'External Method' : _loadExternalMethod
-               }
-"""
-    _loaders = { 'DTML Method'     : _loadDTMLMethod
-                , 'DTML Document'   : _loadDTMLDocument
-                , 'BTreeFolder2'    : _loadFolder
-                , 'Python Method'   : _loadPythonMethod
-                , 'Controller Python Script' : _loadControllerPythonScript
-                , 'Controller Validator' : _loadValidatorScript
-                , 'Controller Page Template' : _loadControllerPageTemplate
-                , 'ZCatalog'        : _loadZCatalog
-                , 'Z Class'         : _loadZClass
-                , 'Common Instance Property Sheet'
-                                    : _loadZClassPropertySheet
-                , 'Zope Permission' : _loadPermission
-                , 'Zope Factory'    : _loadFactory
-                , 'Wizard'          : _loadWizard
-                , 'Wizard Page'     : _loadWizardPage
-                , 'Formulator Form' : _loadFormulatorForm
-               #, 'SQL DB Conn'     : _loadDBConn
-                , 'ZWiki Page'      : _loadZWikiPage
-                }
-"""
+    security.declarePrivate('_loadExternalMethod')
+#    @security.private
+    def _loadExternalMethod(self, folder, objid, fspath):
+        objfile = open(fspath, mode='r')
+        props = self._readProperties(objfile)
+        manage_addExternalMethod(
+            folder,
+            objid,
+            props['title'][0],
+            props['module'][0],
+            props['function'][0])
+        # TODO:  load security self._dumpSecurityInfo(obj, file)
+        # metafile = self._openMetadataFile(fspath)
+        # props = self._readProperties(metafile)
+        metafile.close()
+
+
+    security.declarePrivate('_loadDTMLMethod')
+#    @security.private
+    def _loadDTMLMethod(self, folder, objid, fspath):
+        #   Load objid from file fspath with the accompanying properties file.
+#        obj = self._loadDTML(folder, objid, fspath)
+        objfile = open(fspath, mode='r')
+        addDTMLMethod(folder, objid, '', objfile)
+        obj = folder[objid]
+        metafile = self._openMetadataFile(fspath)
+        props = self._readProperties(metafile)
+        obj.title = props['title'][0]
+#        self._dumpSecurityInfo(obj, metafile)
+        metafile.close()
+
+
+    security.declarePrivate('_loadDTMLDocument')
+#    @security.private
+    def _loadDTMLDocument(self, folder, objid, fspath):
+        #   Load objid from file fspath with the accompanying properties file.
+        objfile = open(fspath, mode='r')
+        addDTMLDocument(folder, objid, '', objfile)
+        obj = folder[objid]
+        metafile = self._openMetadataFile(fspath)
+        props = self._readProperties(metafile)
+        self._loadProperties(obj, props)
+#        self._dumpSecurityInfo(obj, metafile)
+        metafile.close()
+
+
+    # codes used for extension in _HDLext field of _handler tuples:
+    # '=' : dump a file object without extra extension
+    # '-' : dump only metadata file
+    # '/'  : container object (os.join will append '' as /
+    # otherwise, dump the object with the extension indicated
+    _EXTSame, _EXTMeta, _EXTDir = ('=', '-', '/')
+    # named indexes for tuple of handler
+    _HDLext, _HDLdumper, _HDLloader = range(3)
+    _handlers = {
+        'DTML Method'     : ('.dtml', _dumpDTMLMethod, _loadDTMLMethod),
+        'DTML Document'   : ('.dtml', _dumpDTMLDocument, _loadDTMLDocument),
+        'Folder'          : ('/', _dumpFolder, _loadFolder),
+        'BTreeFolder2'    : ('/', _dumpFolder, _loadFolder),
+        'External Method' : ('.em', _dumpExternalMethod, _loadExternalMethod),
+        'Zope Factory'    : ('-', _dumpFactory, None),
+        'File'            : ('=', _dumpFileOrImage, _loadFile),
+        'Image'           : ('=', _dumpFileOrImage, _loadImage),
+        'Formulator Form' : ('.form', _dumpFormulatorForm, None),
+        'Python Method'   : ('.py', _dumpPythonMethod, None),
+        'Script (Python)' : ('.py', _dumpPythonScript, _loadPythonScript),
+        'Controller Python Script' :
+                            ('.cpy', _dumpControllerPythonScript, None),
+        'Controller Validator' : ('.vpy', _dumpValidatorScript, None),
+        'Controller Page Template' :
+                            ('.cpt', _dumpControllerPageTemplate, None),
+        'Page Template'   : ('.pt', _dumpPageTemplate, _loadPageTemplate),
+        'Zope Permission' : ('-', _dumpPermission, None),
+        'Z SQL Method'    : ('.zsql', _dumpSQLMethod, _loadSQLMethod),
+        'ZCatalog'        : ('.catalog', _dumpZCatalog, None),
+        'Z Class'         : ('/', _dumpZClass, None),
+        'Common Instance Property Sheet'
+                          : ('/', _dumpZClassPropertySheet, None),
+        'Wizard'          : ('/', _dumpWizard, None),
+        'Wizard Page'     : ('.wizardpage', _dumpWizardPage, None),
+        # 'SQL DB Conn'     : ('.db', _dumpDBConn, None),
+        'ZWiki Page'      : ('.zwiki', _dumpZWikiPage, None)
+        }
+
+
